@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>LockBox — Create Secure Note</title>
+    <!-- CryptoJS AES-256 — loaded from cdnjs (reliable) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.2.0/crypto-js.min.js"></script>
+    <!-- Google Fonts — falls back gracefully to system fonts if offline -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Syne:wght@700;800&display=swap" rel="stylesheet" />
+    <style>
+        :root {
+            --bg:#050a0e; --surface:#0b1520; --surface2:#0f1f30;
+            --border:#1a3a55; --accent:#00d4ff; --accent-glow:rgba(0,212,255,.18);
+            --danger:#ff4466; --success:#00ffaa; --warn:#ffcc00;
+            --text:#c8dce8; --text-dim:#5a7a8a;
+            --mono:'Share Tech Mono','Courier New',Courier,monospace; --display:'Syne','Segoe UI',Arial,sans-serif;
+        }
+        *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+        html{scroll-behavior:smooth}
+        body{background:var(--bg);color:var(--text);font-family:var(--mono);min-height:100vh;overflow-x:hidden}
+        body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(0,212,255,.03) 1px,transparent 1px),linear-gradient(90deg,rgba(0,212,255,.03) 1px,transparent 1px);background-size:40px 40px;pointer-events:none;z-index:0}
+        body::after{content:'';position:fixed;top:-200px;left:-200px;width:600px;height:600px;background:radial-gradient(circle,rgba(0,212,255,.07) 0%,transparent 70%);pointer-events:none;z-index:0}
+        .page{position:relative;z-index:1;max-width:780px;margin:0 auto;padding:3rem 1.5rem 6rem}
+
+        /* ── Logo ── */
+        .logo-mark{display:flex;align-items:center;gap:.75rem;margin-bottom:3rem;animation:fadeDown .6s ease both}
+        .logo-icon{width:42px;height:42px;border:2px solid var(--accent);border-radius:8px;display:flex;align-items:center;justify-content:center;box-shadow:0 0 16px var(--accent-glow),inset 0 0 16px var(--accent-glow)}
+        .logo-icon svg{width:22px;height:22px;stroke:var(--accent);fill:none}
+        .logo-text{font-family:var(--display);font-weight:800;font-size:1.5rem;color:#fff;letter-spacing:-.02em}
+        .logo-text span{color:var(--accent)}
+
+        /* ── Hero ── */
+        .hero{margin-bottom:2.5rem;animation:fadeDown .6s .1s ease both}
+        .hero h1{font-family:var(--display);font-weight:800;font-size:clamp(1.8rem,5vw,2.8rem);color:#fff;line-height:1.1;letter-spacing:-.03em;margin-bottom:.75rem}
+        .hero h1 .accent{color:var(--accent)}
+        .hero p{font-size:.85rem;color:var(--text-dim);line-height:1.7;max-width:520px}
+        .badges{display:flex;flex-wrap:wrap;gap:.5rem;margin-top:1rem}
+        .badge{font-size:.7rem;padding:.25rem .65rem;border:1px solid var(--border);border-radius:999px;color:var(--accent);background:rgba(0,212,255,.05);letter-spacing:.05em}
+
+        /* ── Card ── */
+        .card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:2rem;position:relative;overflow:hidden;animation:fadeUp .6s .2s ease both}
+        .card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--accent),transparent)}
+
+        /* ── Tabs (Note / File) ── */
+        .tab-row{display:flex;gap:.5rem;margin-bottom:1.5rem}
+        .tab-btn{flex:1;padding:.65rem;border:1px solid var(--border);border-radius:8px;background:transparent;color:var(--text-dim);font-family:var(--mono);font-size:.75rem;letter-spacing:.06em;cursor:pointer;transition:all .2s}
+        .tab-btn.active{background:rgba(0,212,255,.1);border-color:var(--accent);color:var(--accent)}
+        .tab-btn:hover:not(.active){border-color:var(--text-dim);color:var(--text)}
+        .tab-panel{display:none}
+        .tab-panel.active{display:block}
+
+        /* ── Form fields ── */
+        .field{margin-bottom:1.5rem}
+        .field label{display:flex;align-items:center;gap:.4rem;font-size:.75rem;letter-spacing:.08em;color:var(--accent);margin-bottom:.5rem}
+        .field label .dot{width:6px;height:6px;border-radius:50%;background:var(--accent);box-shadow:0 0 6px var(--accent)}
+        textarea,input[type="password"],input[type="text"]{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:var(--mono);font-size:.875rem;padding:.875rem 1rem;outline:none;transition:border-color .2s,box-shadow .2s;resize:vertical}
+        textarea:focus,input:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-glow)}
+        textarea{min-height:200px;line-height:1.7}
+        textarea::placeholder,input::placeholder{color:var(--text-dim)}
+
+        /* ── Secret key row with generate button ── */
+        .key-row{display:flex;gap:.5rem;align-items:flex-start}
+        .key-row input{flex:1}
+        .btn-gen-key{flex-shrink:0;padding:.875rem .9rem;border:1px solid var(--accent);border-radius:8px;background:rgba(0,212,255,.07);color:var(--accent);font-family:var(--mono);font-size:.75rem;cursor:pointer;white-space:nowrap;transition:background .2s;letter-spacing:.04em}
+        .btn-gen-key:hover{background:rgba(0,212,255,.18)}
+
+        /* ── Passphrase reveal box (shown after auto-generate) ── */
+        .passphrase-reveal{margin-top:.6rem;padding:.65rem .9rem;background:rgba(0,212,255,.06);border:1px solid var(--accent);border-radius:6px;display:none;align-items:center;gap:.5rem}
+        .passphrase-reveal.visible{display:flex}
+        .passphrase-text{font-size:.82rem;color:var(--accent);letter-spacing:.06em;flex:1;word-break:break-all}
+        .passphrase-hint{font-size:.68rem;color:var(--warn);margin-top:.35rem;display:none}
+        .passphrase-hint.visible{display:block}
+
+        /* ── Strength bar ── */
+        .strength-bar{height:3px;margin-top:.5rem;border-radius:2px;background:var(--surface2);overflow:hidden}
+        .strength-fill{height:100%;width:0%;border-radius:2px;transition:width .3s,background .3s}
+        .strength-label{font-size:.7rem;margin-top:.3rem;color:var(--text-dim);min-height:1rem}
+
+        /* ── File drop zone ── */
+        .drop-zone{border:2px dashed var(--border);border-radius:8px;padding:2.5rem 1rem;text-align:center;cursor:pointer;transition:border-color .2s,background .2s;background:var(--surface2)}
+        .drop-zone:hover,.drop-zone.dragover{border-color:var(--accent);background:rgba(0,212,255,.04)}
+        .drop-zone-icon{font-size:2rem;margin-bottom:.5rem}
+        .drop-zone-text{font-size:.8rem;color:var(--text-dim);line-height:1.6}
+        .drop-zone-text strong{color:var(--accent)}
+        .file-chip{margin-top:.75rem;padding:.6rem .9rem;background:rgba(0,212,255,.07);border:1px solid var(--accent);border-radius:6px;display:none;align-items:center;justify-content:space-between;gap:.5rem}
+        .file-chip.visible{display:flex}
+        .file-chip-name{font-size:.78rem;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+        .file-chip-size{font-size:.7rem;color:var(--text-dim);flex-shrink:0}
+        .btn-clear{background:none;border:none;color:var(--danger);cursor:pointer;font-size:.9rem;flex-shrink:0}
+
+        /* ── Burn-on-read toggle ── */
+        .options-row{display:flex;align-items:center;gap:.75rem;margin-bottom:1rem;padding:.875rem 1rem;background:var(--surface2);border:1px solid var(--border);border-radius:8px}
+        .toggle{position:relative;width:40px;height:22px;flex-shrink:0}
+        .toggle input{opacity:0;width:0;height:0}
+        .toggle-slider{position:absolute;cursor:pointer;inset:0;background:var(--border);border-radius:999px;transition:background .2s}
+        .toggle-slider::after{content:'';position:absolute;width:16px;height:16px;border-radius:50%;background:#fff;top:3px;left:3px;transition:transform .2s}
+        .toggle input:checked+.toggle-slider{background:var(--accent)}
+        .toggle input:checked+.toggle-slider::after{transform:translateX(18px)}
+        .toggle-label{font-size:.78rem;color:var(--text)}
+
+        /* ── Timer selector ── */
+        .timer-section{margin-bottom:1.5rem}
+        .timer-label{font-size:.75rem;letter-spacing:.08em;color:var(--warn);margin-bottom:.6rem;display:flex;align-items:center;gap:.5rem}
+        .timer-dot{width:6px;height:6px;border-radius:50%;background:var(--warn);box-shadow:0 0 6px var(--warn);flex-shrink:0}
+        .timer-options{display:grid;grid-template-columns:repeat(4,1fr);gap:.5rem}
+        .timer-opt{padding:.75rem .3rem;border:1px solid var(--border);border-radius:8px;background:var(--surface2);color:var(--text-dim);font-family:var(--mono);font-size:.72rem;cursor:pointer;text-align:center;transition:all .2s;letter-spacing:.03em}
+        .timer-opt:hover{border-color:var(--text-dim);color:var(--text)}
+        .timer-opt.selected{border-color:var(--warn);color:var(--warn);background:rgba(255,204,0,.07);box-shadow:0 0 8px rgba(255,204,0,.15)}
+        .timer-opt .opt-icon{font-size:1.2rem;display:block;margin-bottom:.3rem}
+
+        /* ── Generate button ── */
+        .btn-primary{width:100%;padding:.9rem 1.5rem;border:none;border-radius:8px;background:var(--accent);color:#000;font-family:var(--mono);font-size:.875rem;font-weight:bold;letter-spacing:.08em;cursor:pointer;position:relative;overflow:hidden;transition:opacity .2s,box-shadow .2s;margin-top:.5rem}
+        .btn-primary:hover:not(:disabled){box-shadow:0 0 24px rgba(0,212,255,.5)}
+        .btn-primary:disabled{opacity:.5;cursor:not-allowed}
+        .btn-primary::before{content:'';position:absolute;top:0;left:-100%;width:60%;height:100%;background:linear-gradient(120deg,transparent,rgba(255,255,255,.25),transparent);transition:left .45s}
+        .btn-primary:hover::before{left:160%}
+
+        /* ── Result box ── */
+        .result-box{margin-top:1.5rem;background:var(--surface2);border:1px solid var(--success);border-radius:8px;padding:1.25rem;display:none;animation:fadeUp .4s ease both}
+        .result-box.visible{display:block}
+        .result-label{font-size:.7rem;letter-spacing:.1em;color:var(--success);margin-bottom:.6rem}
+        .result-link{font-size:.78rem;color:var(--text);word-break:break-all;line-height:1.6;padding:.75rem;background:var(--surface);border:1px solid var(--border);border-radius:6px;margin-bottom:.875rem;user-select:all}
+        .btn-copy{width:100%;padding:.65rem;border:1px solid var(--success);border-radius:6px;background:transparent;color:var(--success);font-family:var(--mono);font-size:.78rem;cursor:pointer;letter-spacing:.06em;transition:background .2s}
+        .btn-copy:hover{background:rgba(0,255,170,.08)}
+        .burn-warning{margin-top:.75rem;font-size:.7rem;color:var(--text-dim);text-align:center;letter-spacing:.04em;line-height:1.8}
+
+        /* ── Error box ── */
+        .error-box{margin-top:1rem;padding:.75rem 1rem;background:rgba(255,68,102,.08);border:1px solid var(--danger);border-radius:8px;font-size:.8rem;color:var(--danger);display:none}
+        .error-box.visible{display:block}
+
+        /* ── Spinner (inside button) ── */
+        .spinner{display:inline-block;width:14px;height:14px;border:2px solid rgba(0,0,0,.3);border-top-color:#000;border-radius:50%;animation:spin .7s linear infinite;vertical-align:middle;margin-right:6px}
+
+        /* ── How it works section ── */
+        .how-it-works{margin-top:2.5rem;padding:1rem 1.25rem;border:1px solid var(--border);border-radius:8px;animation:fadeUp .6s .35s ease both}
+        .how-it-works h3{font-size:.75rem;letter-spacing:.08em;color:var(--accent);margin-bottom:.6rem}
+        .how-it-works ul{list-style:none;display:flex;flex-direction:column;gap:.3rem}
+        .how-it-works li{font-size:.72rem;color:var(--text-dim);padding-left:1rem;position:relative;line-height:1.6}
+        .how-it-works li::before{content:'›';position:absolute;left:0;color:var(--accent)}
+
+        /* ── Animations ── */
+        @keyframes fadeDown{from{opacity:0;transform:translateY(-14px)}to{opacity:1;transform:translateY(0)}}
+        @keyframes fadeUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
+        @keyframes spin{to{transform:rotate(360deg)}}
+    </style>
+</head>
+<body>
+<main class="page">
+
+    <!-- Logo -->
+    <div class="logo-mark">
+        <div class="logo-icon">
+            <svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+            </svg>
+        </div>
+        <div class="logo-text">Lock<span>Box</span></div>
+    </div>
+
+    <!-- Hero -->
+    <div class="hero">
+        <h1>Share secrets that<br/><span class="accent">self-destruct.</span></h1>
+        <p>Your note or file is encrypted <strong>in your browser</strong> before touching our servers. We store only an unreadable ciphertext — the key never leaves your device.</p>
+        <div class="badges">
+            <span class="badge">AES-256</span>
+            <span class="badge">Zero-Knowledge</span>
+            <span class="badge">Burn-on-Read</span>
+            <span class="badge">File Encryption</span>
+            <span class="badge">Auto-Wipe Timer</span>
+        </div>
+    </div>
+
+    <!-- Main Card -->
+    <div class="card">
+
+        <!-- ── FEATURE 1: Note / File Tabs ── -->
+        <!-- Switch between encrypting a text note or a file attachment -->
+        <div class="tab-row">
+            <button class="tab-btn active" onclick="switchTab('note', this)">📝 SECRET NOTE</button>
+            <button class="tab-btn"        onclick="switchTab('file', this)">📎 FILE ATTACHMENT</button>
+        </div>
+
+        <!-- Tab: Text Note -->
+        <div id="tab-note" class="tab-panel active">
+            <div class="field">
+                <label><span class="dot"></span> SECRET NOTE</label>
+                <textarea id="noteText" placeholder="Type your confidential message here. It will be AES-256 encrypted before leaving your device..." spellcheck="false"></textarea>
+            </div>
+        </div>
+
+        <!-- Tab: File Attachment -->
+        <!-- Files are read as base64 data URLs, bundled with filename, then encrypted -->
+        <div id="tab-file" class="tab-panel">
+            <div class="field">
+                <label><span class="dot"></span> SELECT FILE TO ENCRYPT</label>
+                <!-- Drop zone — accepts click or drag-and-drop -->
+                <div class="drop-zone" id="dropZone" onclick="document.getElementById('fileInput').click()"
+                     ondragover="onDragOver(event)" ondragleave="onDragLeave(event)" ondrop="onDrop(event)">
+                    <div class="drop-zone-icon">🔐</div>
+                    <div class="drop-zone-text">
+                        <strong>Click to browse</strong> or drag &amp; drop a file here<br/>
+                        PDF, images, text files — max 5 MB
+                    </div>
+                </div>
+                <!-- Hidden real file input -->
+                <input type="file" id="fileInput" style="display:none" onchange="onFileSelected(this.files[0])" />
+                <!-- File chip: shows selected filename + size -->
+                <div class="file-chip" id="fileChip">
+                    <span class="file-chip-name" id="chipName"></span>
+                    <span class="file-chip-size" id="chipSize"></span>
+                    <button class="btn-clear" onclick="clearFile()" title="Remove file">✕</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── FEATURE 2: Passphrase Generator ── -->
+        <!-- The secret key never leaves the browser. It's embedded in the URL fragment (#). -->
+        <div class="field">
+            <label><span class="dot"></span> SECRET KEY (ENCRYPTION PASSPHRASE)</label>
+            <div class="key-row">
+                <input type="text" id="secretKey" placeholder="Type a passphrase or click ⚡ GENERATE" autocomplete="off" oninput="evaluateStrength(this.value)" />
+                <!-- Clicking this button generates a cryptographically random passphrase -->
+                <button class="btn-gen-key" onclick="generatePassphrase()" title="Auto-generate a strong random passphrase">⚡ GENERATE</button>
+            </div>
+            <!-- Shown only when a passphrase is auto-generated — reminds user to save it -->
+            <div class="passphrase-reveal" id="passphraseReveal">
+                <span>🔑</span>
+                <span class="passphrase-text" id="passphraseText"></span>
+            </div>
+            <div class="passphrase-hint" id="passphraseHint">
+                ⚠ This passphrase is embedded in the link. Anyone with the link can decrypt the note.
+            </div>
+            <!-- Password strength meter -->
+            <div class="strength-bar"><div class="strength-fill" id="strengthFill"></div></div>
+            <div class="strength-label" id="strengthLabel"></div>
+        </div>
+
+        <!-- Burn-on-read toggle -->
+        <div class="options-row">
+            <label class="toggle">
+                <input type="checkbox" id="isOneTime" checked />
+                <span class="toggle-slider"></span>
+            </label>
+            <span class="toggle-label">🔥 <strong>Burn after reading</strong> — note permanently destroyed after first view</span>
+        </div>
+
+        <!-- ── FEATURE 3: Auto-Wipe Timer ── -->
+        <!-- After the viewer opens the link, the content disappears from their screen after this time -->
+        <div class="timer-section">
+            <div class="timer-label">
+                <span class="timer-dot"></span>
+                VIEWER AUTO-WIPE TIMER — content vanishes from screen after:
+            </div>
+            <div class="timer-options">
+                <!-- Each button sets selectedTimer. "None" = no timer. -->
+                <div class="timer-opt selected" onclick="selectTimer(null, this)">
+                    <span class="opt-icon">♾️</span>No Timer
+                </div>
+                <div class="timer-opt" onclick="selectTimer(30, this)">
+                    <span class="opt-icon">⚡</span>30 Seconds
+                </div>
+                <div class="timer-opt" onclick="selectTimer(60, this)">
+                    <span class="opt-icon">⏱</span>1 Minute
+                </div>
+                <div class="timer-opt" onclick="selectTimer(86400, this)">
+                    <span class="opt-icon">🌙</span>24 Hours
+                </div>
+            </div>
+        </div>
+
+        <!-- Submit button -->
+        <button class="btn-primary" id="generateBtn" onclick="generateLink()">
+            ⚡ GENERATE SECURE LINK
+        </button>
+
+        <!-- Error box -->
+        <div class="error-box" id="errorBox"></div>
+
+        <!-- Result box -->
+        <div class="result-box" id="resultBox">
+            <div class="result-label">✓ SECURE LINK GENERATED — SHARE THIS LINK</div>
+            <div class="result-link" id="resultLink"></div>
+            <button class="btn-copy" onclick="copyLink()">⎘ COPY LINK TO CLIPBOARD</button>
+            <div class="burn-warning" id="burnWarning"></div>
+        </div>
+    </div>
+
+    <!-- How It Works -->
+    <div class="how-it-works">
+        <h3>HOW ZERO-KNOWLEDGE WORKS</h3>
+        <ul>
+            <li>Your note/file is AES-256 encrypted in the browser. The server only ever receives unreadable ciphertext.</li>
+            <li>The secret key is embedded in the URL <em>fragment</em> (#). Browsers never include fragments in HTTP requests — the server cannot see it.</li>
+            <li>With Burn-on-Read, the server deletes the note before responding to the first fetch — preventing any second access.</li>
+            <li>The auto-wipe timer runs entirely in the viewer's browser. After the countdown, the decrypted content is wiped from screen.</li>
+            <li>Files are base64-encoded and encrypted as a single blob. The server has no idea whether the blob is text or a file.</li>
+        </ul>
+    </div>
+
+</main>
+
+<script>
+// =============================================================================
+// LockBox v2 — index.html JavaScript
+//
+// Three new features:
+//   1. Note/File tabs     — switch between encrypting text or a file
+//   2. Passphrase generator — cryptographically random key via crypto.getRandomValues
+//   3. Auto-wipe timer    — selectedTimer value sent to server and embedded in URL
+// =============================================================================
+
+// ── State ─────────────────────────────────────────────────────────────────────
+let currentTab    = 'note';   // 'note' or 'file'
+let selectedFile  = null;     // File object from file input / drop zone
+let selectedTimer = null;     // null | 30 | 60 | 86400  (seconds)
+
+// ── Tab Switching ─────────────────────────────────────────────────────────────
+function switchTab(tab, btn) {
+    currentTab = tab;
+    // Update tab button styles
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    // Show correct panel
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    document.getElementById('tab-' + tab).classList.add('active');
+    // Reset file state when switching away from file tab
+    if (tab === 'note') clearFile();
+}
+
+// ── Timer Selection ───────────────────────────────────────────────────────────
+function selectTimer(seconds, btn) {
+    selectedTimer = seconds;
+    document.querySelectorAll('.timer-opt').forEach(o => o.classList.remove('selected'));
+    btn.classList.add('selected');
+}
+
+// ── File Handling ─────────────────────────────────────────────────────────────
+function onFileSelected(file) {
+    if (!file) return;
+    // Enforce 5 MB limit (files are base64-encoded which adds ~33% overhead)
+    if (file.size > 5 * 1024 * 1024) {
+        showError('File too large. Maximum allowed size is 5 MB.');
+        return;
+    }
+    selectedFile = file;
+    document.getElementById('chipName').textContent = file.name;
+    document.getElementById('chipSize').textContent = formatBytes(file.size);
+    document.getElementById('fileChip').classList.add('visible');
+}
+
+function clearFile() {
+    selectedFile = null;
+    document.getElementById('fileInput').value = '';
+    document.getElementById('fileChip').classList.remove('visible');
+}
+
+function onDragOver(e) {
+    e.preventDefault();
+    document.getElementById('dropZone').classList.add('dragover');
+}
+
+function onDragLeave(e) {
+    document.getElementById('dropZone').classList.remove('dragover');
+}
+
+function onDrop(e) {
+    e.preventDefault();
+    document.getElementById('dropZone').classList.remove('dragover');
+    const file = e.dataTransfer.files[0];
+    if (file) onFileSelected(file);
+}
+
+function formatBytes(b) {
+    if (b < 1024)        return b + ' B';
+    if (b < 1048576)     return (b / 1024).toFixed(1) + ' KB';
+    return (b / 1048576).toFixed(2) + ' MB';
+}
+
+// Reads a File object as a base64 data URL string (e.g. "data:image/png;base64,...")
+// We use this because CryptoJS works with strings, not raw binary buffers.
+function readFileAsBase64(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload  = () => resolve(reader.result);
+        reader.onerror = () => reject(new Error('Failed to read file.'));
+        reader.readAsDataURL(file);
+    });
+}
+
+// ── FEATURE: Passphrase Generator ────────────────────────────────────────────
+// Uses crypto.getRandomValues (the same API browsers use for TLS key generation)
+// to produce a 20-character passphrase from a mixed character set.
+// This is far stronger than any human-chosen password.
+function generatePassphrase() {
+    const charset = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$%^&*';
+    const len     = 20;
+    const arr     = new Uint8Array(len);
+    crypto.getRandomValues(arr);  // Cryptographically secure random bytes
+
+    // Map each random byte to a character in our charset
+    const passphrase = Array.from(arr)
+        .map(b => charset[b % charset.length])
+        .join('');
+
+    // Fill the input field
+    const input = document.getElementById('secretKey');
+    input.value = passphrase;
+    evaluateStrength(passphrase);
+
+    // Show the reveal box so user can see and save the generated passphrase
+    document.getElementById('passphraseText').textContent = passphrase;
+    document.getElementById('passphraseReveal').classList.add('visible');
+    document.getElementById('passphraseHint').classList.add('visible');
+}
+
+// ── Strength Meter ────────────────────────────────────────────────────────────
+function evaluateStrength(key) {
+    const fill  = document.getElementById('strengthFill');
+    const label = document.getElementById('strengthLabel');
+
+    // Hide passphrase reveal if user manually edits the field
+    if (key !== document.getElementById('passphraseText').textContent) {
+        document.getElementById('passphraseReveal').classList.remove('visible');
+        document.getElementById('passphraseHint').classList.remove('visible');
+    }
+
+    if (!key) { fill.style.width = '0%'; label.textContent = ''; return; }
+
+    let score = 0;
+    if (key.length >= 8)          score++;
+    if (key.length >= 14)         score++;
+    if (/[A-Z]/.test(key))        score++;
+    if (/[0-9]/.test(key))        score++;
+    if (/[^A-Za-z0-9]/.test(key)) score++;
+
+    const levels = [
+        { pct:'20%', color:'#ff4466', text:'Too weak'    },
+        { pct:'40%', color:'#ff8844', text:'Weak'        },
+        { pct:'60%', color:'#ffcc00', text:'Fair'        },
+        { pct:'80%', color:'#88ff44', text:'Strong'      },
+        { pct:'100%',color:'#00ffaa', text:'Very strong' },
+    ];
+    const lvl = levels[Math.min(score, 4)];
+    fill.style.width      = lvl.pct;
+    fill.style.background = lvl.color;
+    label.textContent     = lvl.text;
+    label.style.color     = lvl.color;
+}
+
+// ── Error helpers ─────────────────────────────────────────────────────────────
+function showError(msg) {
+    const box = document.getElementById('errorBox');
+    box.textContent = '⚠ ' + msg;
+    box.classList.add('visible');
+}
+function hideError() {
+    document.getElementById('errorBox').classList.remove('visible');
+}
+
+// ── Main: Generate Link ───────────────────────────────────────────────────────
+/**
+ * Full zero-knowledge flow:
+ *   1. Validate inputs
+ *   2. Encrypt content (text or file) with AES-256 in the browser
+ *   3. POST only the encrypted blob + metadata to the server (key NOT included)
+ *   4. Build share URL: /view.html?id=GUID&type=note|file&timer=N#SecretKey
+ *      The #SecretKey fragment is NEVER sent to the server by browsers.
+ */
+async function generateLink() {
+    hideError();
+
+    const secretKey = document.getElementById('secretKey').value.trim();
+    const isOneTime = document.getElementById('isOneTime').checked;
+    const btn       = document.getElementById('generateBtn');
+
+    if (!secretKey || secretKey.length < 4) {
+        return showError('Please enter a secret key (min 4 characters), or click ⚡ GENERATE.');
+    }
+
+    if (currentTab === 'note') {
+        if (!document.getElementById('noteText').value.trim()) {
+            return showError('Please enter a secret note before generating a link.');
+        }
+    } else {
+        if (!selectedFile) {
+            return showError('Please select a file to encrypt and share.');
+        }
+    }
+
+    btn.disabled  = true;
+    btn.innerHTML = '<span class="spinner"></span> ENCRYPTING & UPLOADING...';
+
+    try {
+        let encryptedBlob;
+        const contentType = currentTab; // 'note' or 'file'
+
+        if (contentType === 'note') {
+            // ── Encrypt plain text ──────────────────────────────────────────
+            // CryptoJS.AES.encrypt(plaintext, key).toString() → base64 ciphertext
+            const noteText = document.getElementById('noteText').value.trim();
+            encryptedBlob  = CryptoJS.AES.encrypt(noteText, secretKey).toString();
+
+        } else {
+            // ── Encrypt file ────────────────────────────────────────────────
+            // Step 1: Read file binary as a base64 data URL
+            const dataUrl = await readFileAsBase64(selectedFile);
+            // Step 2: Bundle data URL + original filename into a JSON string
+            //         The viewer page needs the filename to offer the right download name
+            const payload = JSON.stringify({ fileName: selectedFile.name, dataUrl });
+            // Step 3: Encrypt the entire JSON bundle — server sees only ciphertext
+            encryptedBlob = CryptoJS.AES.encrypt(payload, secretKey).toString();
+        }
+
+        // ── POST only the encrypted blob to the server ──────────────────────
+        // The secret key is INTENTIONALLY excluded from this request.
+        // Zero-knowledge: the server cannot decrypt what it receives.
+        const response = await fetch('/api/notes', {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                encryptedBlob,
+                isOneTime,
+                isFile:        contentType === 'file',
+                expirySeconds: selectedTimer,   // null | 30 | 60 | 86400
+            }),
+        });
+
+        if (!response.ok) {
+            const err = await response.json().catch(() => ({}));
+            throw new Error(err.error || `Server error (${response.status})`);
+        }
+
+        const data = await response.json();
+
+        // ── Build the share URL ──────────────────────────────────────────────
+        // Format: /view.html?id=GUID&type=note|file&timer=30#SecretKey
+        //
+        // The #SecretKey is the URL FRAGMENT — critical security boundary:
+        //   - Browsers NEVER include the fragment in HTTP requests (per RFC 3986)
+        //   - Server receives: /view.html?id=GUID&type=...  (no key)
+        //   - Viewer browser reads window.location.hash locally to get the key
+        const base  = `${window.location.origin}/view.html`;
+        let   query = `?id=${data.noteId}&type=${contentType}`;
+        if (selectedTimer) query += `&timer=${selectedTimer}`;
+        const shareUrl = `${base}${query}#${encodeURIComponent(secretKey)}`;
+
+        // Show result
+        document.getElementById('resultLink').textContent = shareUrl;
+
+        const lines = [];
+        if (isOneTime)              lines.push('🔥 Burn-on-Read: permanently destroyed after the first view.');
+        if (selectedTimer)          lines.push(`⏱ Auto-wipe: content disappears from the viewer after ${formatTimer(selectedTimer)}.`);
+        if (contentType === 'file') lines.push(`📎 Encrypted file: "${selectedFile.name}" is locked inside this link.`);
+        if (!isOneTime && !selectedTimer) lines.push('📌 Persistent: this note can be viewed multiple times.');
+        document.getElementById('burnWarning').innerHTML = lines.join('<br/>');
+
+        document.getElementById('resultBox').classList.add('visible');
+        document.getElementById('resultBox').scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+    } catch (err) {
+        showError(err.message || 'An unexpected error occurred. Please try again.');
+    } finally {
+        btn.disabled  = false;
+        btn.innerHTML = '⚡ GENERATE SECURE LINK';
+    }
+}
+
+function formatTimer(s) {
+    if (s === 30)    return '30 seconds';
+    if (s === 60)    return '1 minute';
+    if (s === 86400) return '24 hours';
+    return s + ' seconds';
+}
+
+// ── Copy Link ─────────────────────────────────────────────────────────────────
+async function copyLink() {
+    const link = document.getElementById('resultLink').textContent;
+    try {
+        await navigator.clipboard.writeText(link);
+        const btn = document.querySelector('.btn-copy');
+        btn.textContent = '✓ COPIED!';
+        setTimeout(() => { btn.textContent = '⎘ COPY LINK TO CLIPBOARD'; }, 2000);
+    } catch {
+        const el = document.createElement('textarea');
+        el.value = link;
+        document.body.appendChild(el);
+        el.select();
+        document.execCommand('copy');
+        document.body.removeChild(el);
+    }
+}
+</script>
+</body>
+</html>
