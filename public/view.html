@@ -3,260 +3,407 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>LockBox — View Secure Note</title>
-    <!-- CryptoJS AES-256 — loaded from cdnjs (reliable) -->
+    <title>LockBox — View Note</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.2.0/crypto-js.min.js"></script>
-    <!-- Google Fonts — falls back gracefully to system fonts if offline -->
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Syne:wght@700;800&display=swap" rel="stylesheet" />
     <style>
         :root {
-            --bg:#050a0e; --surface:#0b1520; --surface2:#0f1f30;
-            --border:#1a3a55; --accent:#00d4ff; --accent-glow:rgba(0,212,255,.18);
-            --danger:#ff4466; --danger-bg:rgba(255,68,102,.06);
-            --success:#00ffaa; --warn:#ffcc00;
-            --text:#c8dce8; --text-dim:#5a7a8a;
-            --mono:'Share Tech Mono','Courier New',Courier,monospace; --display:'Syne','Segoe UI',Arial,sans-serif;
+            --bg:       #0a0a0a;
+            --surface:  #111111;
+            --surface2: #181818;
+            --border:   #2a2a2a;
+            --border-h: #3a3a3a;
+            --red:      #cc2200;
+            --red-dim:  #991a00;
+            --red-bg:   rgba(204,34,0,0.07);
+            --text:     #e0e0e0;
+            --text-dim: #666666;
+            --mono:     'Courier New', Courier, monospace;
         }
-        *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-        body{background:var(--bg);color:var(--text);font-family:var(--mono);min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;overflow-x:hidden}
-        body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(0,212,255,.03) 1px,transparent 1px),linear-gradient(90deg,rgba(0,212,255,.03) 1px,transparent 1px);background-size:40px 40px;pointer-events:none;z-index:0}
-        body::after{content:'';position:fixed;bottom:-200px;right:-200px;width:600px;height:600px;background:radial-gradient(circle,rgba(0,212,255,.06) 0%,transparent 70%);pointer-events:none;z-index:0}
 
-        .page{position:relative;z-index:1;width:100%;max-width:720px;padding:2rem 1.5rem 4rem}
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-        /* Logo */
-        .logo-mark{display:flex;align-items:center;gap:.75rem;margin-bottom:2.5rem}
-        .logo-icon{width:38px;height:38px;border:2px solid var(--accent);border-radius:8px;display:flex;align-items:center;justify-content:center;box-shadow:0 0 16px var(--accent-glow),inset 0 0 16px var(--accent-glow)}
-        .logo-icon svg{width:20px;height:20px;stroke:var(--accent);fill:none}
-        .logo-text{font-family:var(--display);font-weight:800;font-size:1.4rem;color:#fff;letter-spacing:-.02em}
-        .logo-text span{color:var(--accent)}
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: var(--mono);
+            font-size: 14px;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            line-height: 1.6;
+        }
+
+        .page {
+            width: 100%;
+            max-width: 660px;
+            padding: 2.5rem 1.5rem 4rem;
+        }
+
+        /* Header */
+        .site-header {
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 1.25rem;
+            margin-bottom: 2rem;
+            display: flex;
+            align-items: baseline;
+            gap: 1rem;
+        }
+
+        .logo { font-size: 1.1rem; font-weight: bold; color: #fff; letter-spacing: 0.1em; text-transform: uppercase; }
+        .logo span { color: var(--red); }
+        .tagline { font-size: 0.72rem; color: var(--text-dim); }
 
         /* Loading */
-        #loadingState{text-align:center;padding:3rem 0;animation:fadeIn .4s ease}
-        .decrypt-anim{display:flex;align-items:center;justify-content:center;gap:.5rem;margin-bottom:1rem}
-        .decrypt-dot{width:10px;height:10px;border-radius:50%;background:var(--accent);animation:pulse 1.2s ease-in-out infinite}
-        .decrypt-dot:nth-child(2){animation-delay:.2s}
-        .decrypt-dot:nth-child(3){animation-delay:.4s}
-        .loading-text{font-size:.8rem;color:var(--text-dim);letter-spacing:.1em}
+        #loadingState { text-align: center; padding: 3rem 0; }
+        .loading-text { font-size: 0.75rem; color: var(--text-dim); letter-spacing: 0.1em; text-transform: uppercase; }
+        .loading-dots { display: inline-block; }
+        .loading-dots::after {
+            content: '';
+            animation: dots 1.5s steps(4, end) infinite;
+        }
+        @keyframes dots {
+            0%   { content: ''; }
+            25%  { content: '.'; }
+            50%  { content: '..'; }
+            75%  { content: '...'; }
+        }
 
         /* Note state */
-        #noteState{display:none;animation:fadeUp .5s ease both}
-        .success-header{display:flex;align-items:center;gap:.75rem;margin-bottom:1.5rem}
-        .success-header .icon{font-size:1.5rem}
-        .success-header h2{font-family:var(--display);font-weight:800;font-size:1.3rem;color:#fff}
-        .success-header p{font-size:.72rem;color:var(--text-dim);margin-top:.1rem}
+        #noteState { display: none; }
 
-        /* Note card */
-        .note-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;position:relative}
-        .note-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--success),transparent)}
-        .note-card-header{display:flex;align-items:center;justify-content:space-between;padding:.75rem 1.25rem;border-bottom:1px solid var(--border);background:var(--surface2)}
-        .note-card-header span{font-size:.7rem;letter-spacing:.08em;color:var(--success)}
-        .btn-copy-note{font-size:.7rem;padding:.3rem .8rem;border:1px solid var(--border);border-radius:5px;background:transparent;color:var(--text-dim);cursor:pointer;font-family:var(--mono);transition:border-color .2s,color .2s}
-        .btn-copy-note:hover{border-color:var(--accent);color:var(--accent)}
-        .note-content{padding:1.5rem;font-size:.9rem;line-height:1.8;white-space:pre-wrap;word-break:break-word;color:var(--text);min-height:120px}
+        .state-label {
+            font-size: 0.68rem;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            color: var(--text-dim);
+            margin-bottom: 1rem;
+            padding-bottom: 0.4rem;
+            border-bottom: 1px solid var(--border);
+        }
 
-        /* File download card */
-        .file-card{padding:1.5rem;display:flex;align-items:center;gap:1rem}
-        .file-icon{font-size:2.5rem;flex-shrink:0}
-        .file-meta{flex:1}
-        .file-meta-name{font-size:.9rem;color:var(--text);margin-bottom:.25rem;word-break:break-all}
-        .file-meta-sub{font-size:.72rem;color:var(--text-dim)}
-        .btn-download{padding:.65rem 1.2rem;border:none;border-radius:7px;background:var(--accent);color:#000;font-family:var(--mono);font-size:.78rem;font-weight:bold;cursor:pointer;letter-spacing:.05em;white-space:nowrap;transition:box-shadow .2s;flex-shrink:0}
-        .btn-download:hover{box-shadow:0 0 16px rgba(0,212,255,.4)}
+        /* Content card */
+        .content-card {
+            border: 1px solid var(--border);
+            border-radius: 2px;
+            overflow: hidden;
+        }
 
-        /* ── Timer countdown bar ── */
-        .timer-bar-wrap{margin-top:1rem;padding:.875rem 1rem;background:rgba(255,204,0,.06);border:1px solid rgba(255,204,0,.3);border-radius:8px}
-        .timer-bar-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:.5rem}
-        .timer-bar-label{font-size:.72rem;color:var(--warn);letter-spacing:.05em}
-        .timer-bar-count{font-size:1rem;color:var(--warn);font-weight:bold;letter-spacing:.08em}
-        .timer-bar-track{height:4px;background:var(--surface2);border-radius:2px;overflow:hidden}
-        .timer-bar-fill{height:100%;background:var(--warn);border-radius:2px;transition:width 1s linear}
-        .timer-bar-hint{font-size:.68rem;color:var(--text-dim);margin-top:.4rem}
+        .card-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.5rem 0.875rem;
+            background: var(--surface2);
+            border-bottom: 1px solid var(--border);
+        }
 
-        /* Wiped state (shown after timer expires) */
-        .wiped-overlay{display:none;text-align:center;padding:2rem;border:1px solid var(--danger);border-radius:12px;background:var(--danger-bg)}
-        .wiped-overlay.visible{display:block;animation:fadeIn .4s ease}
-        .wiped-overlay .wipe-icon{font-size:2.5rem;margin-bottom:.75rem}
-        .wiped-overlay h3{font-family:var(--display);color:var(--danger);font-size:1.2rem;margin-bottom:.5rem}
-        .wiped-overlay p{font-size:.78rem;color:var(--text-dim)}
+        .card-header-label {
+            font-size: 0.65rem;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            color: var(--text-dim);
+        }
 
-        /* Burn / notices */
-        .burn-notice{margin-top:1rem;padding:.75rem 1rem;background:rgba(255,68,102,.07);border:1px solid rgba(255,68,102,.3);border-radius:8px;font-size:.75rem;color:var(--danger);letter-spacing:.04em}
-        .back-link{display:inline-block;margin-top:1.5rem;font-size:.75rem;color:var(--text-dim);text-decoration:none;letter-spacing:.05em;transition:color .2s}
-        .back-link:hover{color:var(--accent)}
+        .btn-copy-note {
+            font-size: 0.65rem;
+            padding: 0.25rem 0.6rem;
+            border: 1px solid var(--border);
+            border-radius: 2px;
+            background: transparent;
+            color: var(--text-dim);
+            font-family: var(--mono);
+            cursor: pointer;
+            letter-spacing: 0.06em;
+        }
+
+        .btn-copy-note:hover { border-color: var(--red); color: var(--red); }
+
+        .note-content {
+            padding: 1.25rem;
+            font-size: 0.875rem;
+            line-height: 1.8;
+            white-space: pre-wrap;
+            word-break: break-word;
+            min-height: 100px;
+            color: var(--text);
+        }
+
+        /* File card */
+        .file-card {
+            padding: 1.25rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+        }
+
+        .file-info { flex: 1; }
+        .file-name { font-size: 0.875rem; color: var(--text); margin-bottom: 0.2rem; word-break: break-all; }
+        .file-sub  { font-size: 0.7rem; color: var(--text-dim); }
+
+        .btn-download {
+            padding: 0.6rem 1rem;
+            border: 1px solid var(--red);
+            border-radius: 2px;
+            background: transparent;
+            color: var(--red);
+            font-family: var(--mono);
+            font-size: 0.72rem;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            cursor: pointer;
+            white-space: nowrap;
+            flex-shrink: 0;
+        }
+
+        .btn-download:hover { background: var(--red-bg); }
+
+        /* Timer bar */
+        .timer-bar-wrap {
+            margin-top: 0.75rem;
+            padding: 0.75rem 0.875rem;
+            border: 1px solid var(--border);
+            border-radius: 2px;
+            background: var(--surface);
+        }
+
+        .timer-bar-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 0.4rem;
+        }
+
+        .timer-bar-label {
+            font-size: 0.65rem;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            color: var(--text-dim);
+        }
+
+        .timer-bar-count {
+            font-size: 0.875rem;
+            color: var(--text);
+            font-weight: bold;
+            letter-spacing: 0.06em;
+        }
+
+        .timer-bar-track {
+            height: 2px;
+            background: var(--border);
+            overflow: hidden;
+        }
+
+        .timer-bar-fill {
+            height: 100%;
+            width: 100%;
+            background: var(--red);
+        }
+
+        .timer-bar-hint {
+            font-size: 0.65rem;
+            color: var(--text-dim);
+            margin-top: 0.3rem;
+        }
+
+        /* Wiped overlay */
+        .wiped-overlay {
+            display: none;
+            padding: 2rem;
+            border: 1px solid var(--border);
+            border-radius: 2px;
+            background: var(--surface);
+            text-align: center;
+        }
+
+        .wiped-overlay.visible { display: block; }
+        .wiped-title { font-size: 0.875rem; color: var(--red); margin-bottom: 0.4rem; letter-spacing: 0.06em; }
+        .wiped-sub { font-size: 0.72rem; color: var(--text-dim); }
+
+        /* Notices */
+        .burn-notice {
+            margin-top: 0.75rem;
+            padding: 0.6rem 0.875rem;
+            border: 1px solid var(--border);
+            border-radius: 2px;
+            font-size: 0.72rem;
+            color: var(--text-dim);
+            background: var(--surface);
+        }
+
+        .back-link {
+            display: inline-block;
+            margin-top: 1.5rem;
+            font-size: 0.72rem;
+            color: var(--text-dim);
+            text-decoration: none;
+        }
+
+        .back-link:hover { color: var(--red); }
 
         /* Error state */
-        #errorState{display:none;animation:fadeUp .5s ease both}
-        .error-card{background:var(--danger-bg);border:1px solid rgba(255,68,102,.3);border-radius:12px;padding:2rem;position:relative;overflow:hidden;text-align:center}
-        .error-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--danger),transparent)}
-        .error-icon{font-size:3rem;margin-bottom:1rem}
-        .error-title{font-family:var(--display);font-weight:800;font-size:1.5rem;color:var(--danger);margin-bottom:.75rem}
-        .error-message{font-size:.82rem;color:var(--text);line-height:1.7;margin-bottom:.75rem}
-        .error-sub{font-size:.72rem;color:var(--text-dim);margin-bottom:1.5rem}
-        .btn-home{display:inline-block;padding:.7rem 1.5rem;background:var(--accent);color:#000;font-family:var(--mono);font-size:.8rem;font-weight:bold;letter-spacing:.06em;border-radius:7px;text-decoration:none;transition:box-shadow .2s}
-        .btn-home:hover{box-shadow:0 0 20px rgba(0,212,255,.45)}
+        #errorState { display: none; }
 
-        @keyframes fadeIn{from{opacity:0}to{opacity:1}}
-        @keyframes fadeUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
-        @keyframes pulse{0%,100%{opacity:.3;transform:scale(.85)}50%{opacity:1;transform:scale(1)}}
+        .error-card {
+            border: 1px solid var(--border);
+            border-radius: 2px;
+            overflow: hidden;
+        }
+
+        .error-card-header {
+            padding: 0.5rem 0.875rem;
+            background: var(--red-bg);
+            border-bottom: 1px solid var(--red-dim);
+            font-size: 0.65rem;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            color: var(--red);
+        }
+
+        .error-card-body { padding: 1.25rem; }
+        .error-title { font-size: 0.95rem; color: var(--text); margin-bottom: 0.5rem; }
+        .error-message { font-size: 0.78rem; color: var(--text-dim); margin-bottom: 0.3rem; line-height: 1.7; }
+        .error-sub { font-size: 0.7rem; color: var(--text-dim); margin-bottom: 1.25rem; }
+
+        .btn-home {
+            display: inline-block;
+            padding: 0.6rem 1rem;
+            border: 1px solid var(--border);
+            border-radius: 2px;
+            background: transparent;
+            color: var(--text-dim);
+            font-family: var(--mono);
+            font-size: 0.72rem;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            text-decoration: none;
+            cursor: pointer;
+        }
+
+        .btn-home:hover { border-color: var(--red); color: var(--red); }
     </style>
 </head>
 <body>
 <div class="page">
 
-    <!-- Logo -->
-    <div class="logo-mark">
-        <div class="logo-icon">
-            <svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
-                <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-            </svg>
-        </div>
-        <div class="logo-text">Lock<span>Box</span></div>
-    </div>
+    <!-- Header -->
+    <header class="site-header">
+        <div class="logo">Lock<span>Box</span></div>
+        <div class="tagline">Zero-knowledge encrypted note sharing</div>
+    </header>
 
     <!-- Loading -->
     <div id="loadingState">
-        <div class="decrypt-anim">
-            <div class="decrypt-dot"></div>
-            <div class="decrypt-dot"></div>
-            <div class="decrypt-dot"></div>
-        </div>
-        <div class="loading-text">FETCHING &amp; DECRYPTING...</div>
+        <div class="loading-text">Fetching and decrypting<span class="loading-dots"></span></div>
     </div>
 
-    <!-- Success: Decrypted Content -->
+    <!-- Success -->
     <div id="noteState">
-        <div class="success-header">
-            <div class="icon">🔓</div>
-            <div>
-                <h2 id="successTitle">Decrypted Successfully</h2>
-                <p>Decryption completed locally in your browser. The server never saw this content.</p>
-            </div>
-        </div>
+        <div class="state-label" id="stateLabel">Decrypted note</div>
 
-        <!-- Content card (note text OR file download) -->
-        <div class="note-card" id="contentCard">
-            <div class="note-card-header">
-                <span id="cardLabel">DECRYPTED MESSAGE</span>
-                <button class="btn-copy-note" id="copyBtn" onclick="copyNote()">⎘ Copy</button>
+        <div class="content-card" id="contentCard">
+            <div class="card-header">
+                <span class="card-header-label" id="cardLabel">Message</span>
+                <button class="btn-copy-note" id="copyBtn" onclick="copyNote()">Copy</button>
             </div>
-            <!-- Text note content -->
             <div class="note-content" id="noteContent"></div>
-            <!-- File download area (hidden until a file is decrypted) -->
             <div class="file-card" id="fileCard" style="display:none">
-                <div class="file-icon">📄</div>
-                <div class="file-meta">
-                    <div class="file-meta-name" id="fileName">filename.pdf</div>
-                    <div class="file-meta-sub">Decrypted in browser — click to download</div>
+                <div class="file-info">
+                    <div class="file-name" id="fileName"></div>
+                    <div class="file-sub">Decrypted in browser — click to download</div>
                 </div>
-                <button class="btn-download" onclick="downloadFile()">⬇ DOWNLOAD</button>
+                <button class="btn-download" onclick="downloadFile()">Download</button>
             </div>
         </div>
 
-        <!-- ── FEATURE: Auto-wipe countdown timer ── -->
-        <!-- Shown when the sender set a timer. Counts down and then wipes the content. -->
+        <!-- Timer bar -->
         <div class="timer-bar-wrap" id="timerBar" style="display:none">
             <div class="timer-bar-row">
-                <span class="timer-bar-label">⏱ AUTO-WIPE COUNTDOWN</span>
+                <span class="timer-bar-label">Auto-wipe countdown</span>
                 <span class="timer-bar-count" id="timerCount">--</span>
             </div>
             <div class="timer-bar-track">
-                <div class="timer-bar-fill" id="timerFill" style="width:100%"></div>
+                <div class="timer-bar-fill" id="timerFill"></div>
             </div>
-            <div class="timer-bar-hint">Content will be permanently wiped from this screen when the timer reaches zero.</div>
+            <div class="timer-bar-hint">Content will be wiped from this screen when the timer reaches zero.</div>
         </div>
 
-        <!-- Shown after timer expires — replaces the content card -->
+        <!-- Wiped overlay -->
         <div class="wiped-overlay" id="wipedOverlay">
-            <div class="wipe-icon">💥</div>
-            <h3>Content Wiped</h3>
-            <p>The auto-wipe timer has expired. The decrypted content has been permanently removed from this screen.</p>
+            <div class="wiped-title">Content wiped</div>
+            <div class="wiped-sub">The auto-wipe timer expired. The decrypted content has been removed from this screen.</div>
         </div>
 
+        <!-- Burn notice -->
         <div class="burn-notice" id="burnNotice" style="display:none">
-            🔥 This was a <strong>burn-on-read</strong> note. It has been permanently destroyed from the server and cannot be accessed again.
+            Burn-on-read: this note has been permanently deleted from the server. It cannot be accessed again.
         </div>
 
-        <a href="/" class="back-link">← Create a new secure note</a>
+        <a href="/" class="back-link">Create a new note</a>
     </div>
 
-    <!-- Error State -->
+    <!-- Error -->
     <div id="errorState">
         <div class="error-card">
-            <div class="error-icon" id="errorIcon">⚠️</div>
-            <div class="error-title" id="errorTitle">Access Denied</div>
-            <div class="error-message" id="errorMessage">This note could not be retrieved or decrypted.</div>
-            <div class="error-sub" id="errorSub"></div>
-            <a href="/" class="btn-home">+ CREATE NEW NOTE</a>
+            <div class="error-card-header">Access failed</div>
+            <div class="error-card-body">
+                <div class="error-title" id="errorTitle">Error</div>
+                <div class="error-message" id="errorMessage"></div>
+                <div class="error-sub" id="errorSub"></div>
+                <a href="/" class="btn-home">Create new note</a>
+            </div>
         </div>
     </div>
 
 </div>
 
 <script>
-// =============================================================================
-// LockBox v2 — view.html JavaScript
-//
-// Zero-Knowledge Decryption Flow:
-//   1. Parse NoteID from URL query string (?id=...)
-//   2. Parse SecretKey from URL fragment (window.location.hash) — never sent to server
-//   3. Parse content type and timer from query string (?type=note|file&timer=30)
-//   4. Fetch encrypted blob from GET /api/notes/:id
-//   5. Decrypt locally with CryptoJS AES
-//   6. Display: text note or file download button
-//   7. If timer set: start countdown — wipe content when it reaches zero
-// =============================================================================
+let decryptedFileData = null;
+let timerInterval     = null;
 
-let decryptedFileData = null;  // Holds { fileName, dataUrl } for file downloads
-let timerInterval     = null;  // setInterval handle for countdown
-
-// ── Error / Success helpers ───────────────────────────────────────────────────
-function showError(icon, title, message, sub = '') {
-    document.getElementById('loadingState').style.display  = 'none';
-    document.getElementById('errorIcon').textContent       = icon;
-    document.getElementById('errorTitle').textContent      = title;
-    document.getElementById('errorMessage').textContent    = message;
-    document.getElementById('errorSub').textContent        = sub;
-    document.getElementById('errorState').style.display    = 'block';
+function showError(title, message, sub = '') {
+    document.getElementById('loadingState').style.display = 'none';
+    document.getElementById('errorTitle').textContent     = title;
+    document.getElementById('errorMessage').textContent   = message;
+    document.getElementById('errorSub').textContent       = sub;
+    document.getElementById('errorState').style.display   = 'block';
 }
 
 function showNoteContent(plaintext, isOneTime, timerSeconds) {
-    document.getElementById('loadingState').style.display  = 'none';
-    document.getElementById('successTitle').textContent    = 'Note Decrypted Successfully';
-    document.getElementById('cardLabel').textContent       = 'DECRYPTED MESSAGE';
-    document.getElementById('noteContent').textContent     = plaintext;
-    document.getElementById('noteContent').style.display   = 'block';
-    document.getElementById('fileCard').style.display      = 'none';
-    document.getElementById('copyBtn').style.display       = 'block';
+    document.getElementById('loadingState').style.display = 'none';
+    document.getElementById('stateLabel').textContent     = 'Decrypted note';
+    document.getElementById('cardLabel').textContent      = 'Message';
+    document.getElementById('noteContent').textContent    = plaintext;
+    document.getElementById('noteContent').style.display  = 'block';
+    document.getElementById('fileCard').style.display     = 'none';
+    document.getElementById('copyBtn').style.display      = 'block';
     if (isOneTime) document.getElementById('burnNotice').style.display = 'block';
-    document.getElementById('noteState').style.display     = 'block';
+    document.getElementById('noteState').style.display    = 'block';
     if (timerSeconds) startTimer(timerSeconds);
 }
 
 function showFileContent(fileData, isOneTime, timerSeconds) {
     decryptedFileData = fileData;
-    document.getElementById('loadingState').style.display  = 'none';
-    document.getElementById('successTitle').textContent    = 'File Decrypted Successfully';
-    document.getElementById('cardLabel').textContent       = 'DECRYPTED FILE';
-    document.getElementById('noteContent').style.display   = 'none';
-    document.getElementById('copyBtn').style.display       = 'none';
-    document.getElementById('fileName').textContent        = fileData.fileName;
-    document.getElementById('fileCard').style.display      = 'flex';
+    document.getElementById('loadingState').style.display = 'none';
+    document.getElementById('stateLabel').textContent     = 'Decrypted file';
+    document.getElementById('cardLabel').textContent      = 'File';
+    document.getElementById('noteContent').style.display  = 'none';
+    document.getElementById('copyBtn').style.display      = 'none';
+    document.getElementById('fileName').textContent       = fileData.fileName;
+    document.getElementById('fileCard').style.display     = 'flex';
     if (isOneTime) document.getElementById('burnNotice').style.display = 'block';
-    document.getElementById('noteState').style.display     = 'block';
+    document.getElementById('noteState').style.display    = 'block';
     if (timerSeconds) startTimer(timerSeconds);
 }
 
-// ── Copy note text ────────────────────────────────────────────────────────────
 async function copyNote() {
     const text = document.getElementById('noteContent').textContent;
     try {
         await navigator.clipboard.writeText(text);
         const btn = document.getElementById('copyBtn');
-        btn.textContent = '✓ Copied!';
-        setTimeout(() => { btn.textContent = '⎘ Copy'; }, 2000);
+        btn.textContent = 'Copied!';
+        setTimeout(() => { btn.textContent = 'Copy'; }, 2000);
     } catch {
         const el = document.createElement('textarea');
         el.value = text;
@@ -267,8 +414,6 @@ async function copyNote() {
     }
 }
 
-// ── File download ─────────────────────────────────────────────────────────────
-// Creates a temporary anchor tag with the decrypted data URL and triggers download
 function downloadFile() {
     if (!decryptedFileData) return;
     const a    = document.createElement('a');
@@ -279,100 +424,61 @@ function downloadFile() {
     document.body.removeChild(a);
 }
 
-// ── FEATURE: Auto-wipe Timer ──────────────────────────────────────────────────
-// Starts a visible countdown bar. When it hits zero:
-//   - Clears the decrypted content from the DOM (text or file reference)
-//   - Hides the content card
-//   - Shows the "Content Wiped" overlay
-//   - Nulls out decryptedFileData so the file cannot be downloaded after wipe
 function startTimer(totalSeconds) {
-    const bar      = document.getElementById('timerBar');
-    const fill     = document.getElementById('timerFill');
-    const count    = document.getElementById('timerCount');
-
+    const bar   = document.getElementById('timerBar');
+    const fill  = document.getElementById('timerFill');
+    const count = document.getElementById('timerCount');
     bar.style.display = 'block';
     let remaining = totalSeconds;
 
     function formatTime(s) {
-        if (s >= 3600) {
-            const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60);
-            return `${h}h ${m}m`;
-        }
-        if (s >= 60) {
-            const m = Math.floor(s / 60), sec = s % 60;
-            return `${m}m ${sec.toString().padStart(2,'0')}s`;
-        }
+        if (s >= 3600) { const h = Math.floor(s/3600), m = Math.floor((s%3600)/60); return `${h}h ${m}m`; }
+        if (s >= 60)   { const m = Math.floor(s/60), sec = s%60; return `${m}m ${sec.toString().padStart(2,'0')}s`; }
         return `${s}s`;
     }
 
-    // Update immediately then every second
-    count.textContent     = formatTime(remaining);
-    fill.style.width      = '100%';
+    count.textContent = formatTime(remaining);
+    fill.style.width  = '100%';
 
     timerInterval = setInterval(() => {
         remaining--;
         count.textContent = formatTime(remaining);
         fill.style.width  = ((remaining / totalSeconds) * 100) + '%';
-
-        // Color shifts red as time runs low
-        if (remaining <= 10) {
-            fill.style.background = 'var(--danger)';
-            count.style.color     = 'var(--danger)';
-        }
-
-        if (remaining <= 0) {
-            clearInterval(timerInterval);
-            wipeContent();
-        }
+        if (remaining <= 0) { clearInterval(timerInterval); wipeContent(); }
     }, 1000);
 }
 
-// Permanently removes the decrypted content from the DOM
 function wipeContent() {
-    // Wipe text
-    document.getElementById('noteContent').textContent  = '';
-    // Wipe file reference — prevents download after timer
+    document.getElementById('noteContent').textContent    = '';
     decryptedFileData = null;
-    // Hide the content card and timer bar
-    document.getElementById('contentCard').style.display = 'none';
-    document.getElementById('timerBar').style.display    = 'none';
-    document.getElementById('burnNotice').style.display  = 'none';
-    // Show wiped overlay
+    document.getElementById('contentCard').style.display  = 'none';
+    document.getElementById('timerBar').style.display     = 'none';
+    document.getElementById('burnNotice').style.display   = 'none';
     document.getElementById('wipedOverlay').classList.add('visible');
 }
 
-// =============================================================================
-// Main — runs on page load
-// =============================================================================
+// Main
 (async function init() {
-
-    // ── Step 1: Parse URL parameters ─────────────────────────────────────────
     const params      = new URLSearchParams(window.location.search);
     const noteId      = params.get('id');
-    const contentType = params.get('type') || 'note';   // 'note' or 'file'
-    const timerParam  = parseInt(params.get('timer'));   // seconds or NaN
+    const contentType = params.get('type') || 'note';
+    const timerParam  = parseInt(params.get('timer'));
 
     if (!noteId) {
-        return showError('🔍', 'No Note ID Found',
-            'The URL does not contain a Note ID.',
-            'Make sure you copied the complete link including the "?id=..." part.');
+        return showError('No note ID found',
+            'The URL does not contain a note ID.',
+            'Make sure you copied the complete link including the ?id=... part.');
     }
 
-    // ── Step 2: Extract SecretKey from URL fragment ───────────────────────────
-    // window.location.hash = "#SecretKey"
-    // This value is browser-local — NEVER sent in HTTP requests (RFC 3986 §3.5)
-    // The server is architecturally incapable of seeing this key.
     const rawHash   = window.location.hash;
     const secretKey = rawHash.startsWith('#') ? decodeURIComponent(rawHash.slice(1)) : '';
 
     if (!secretKey) {
-        return showError('🔑', 'Missing Decryption Key',
-            'The URL does not contain a secret key in the # fragment portion.',
+        return showError('Missing decryption key',
+            'The URL does not contain a secret key in the # fragment.',
             'The complete link should look like: /view.html?id=GUID#YourKey');
     }
 
-    // ── Step 3: Fetch encrypted blob from server ──────────────────────────────
-    // Server receives only the NoteID. If IsOneTime=1, server deletes note before responding.
     let encryptedBlob, isOneTime, remainingSeconds;
 
     try {
@@ -380,12 +486,12 @@ function wipeContent() {
 
         if (response.status === 404) {
             const body = await response.json().catch(() => ({}));
-            return showError('🔥',
-                body.expired ? 'Note Expired' : 'Note Not Found or Already Burned',
+            return showError(
+                body.expired ? 'Note expired' : 'Note not found',
                 body.expired
-                    ? 'This note has passed its expiry time and was permanently deleted from the server.'
-                    : 'This note no longer exists in our database.',
-                'It was either a one-time note already viewed, it expired, or the link is incorrect.');
+                    ? 'This note passed its expiry time and was permanently deleted.'
+                    : 'This note no longer exists in the database.',
+                'It may have already been read (burn-on-read), expired, or the link is incorrect.');
         }
 
         if (!response.ok) {
@@ -393,56 +499,45 @@ function wipeContent() {
             throw new Error(err.error || `Server error (${response.status})`);
         }
 
-        const data     = await response.json();
-        encryptedBlob  = data.encryptedBlob;
-        isOneTime      = data.isOneTime;
-        // Use remaining seconds from server if available, otherwise use URL param
+        const data       = await response.json();
+        encryptedBlob    = data.encryptedBlob;
+        isOneTime        = data.isOneTime;
         remainingSeconds = data.remainingSeconds || (isNaN(timerParam) ? null : timerParam);
 
     } catch (err) {
-        return showError('⚡', 'Network Error',
-            `Could not reach the LockBox server: ${err.message}`,
-            'Please check your connection and try again.');
+        return showError('Network error',
+            `Could not reach the server: ${err.message}`,
+            'Check your connection and try again.');
     }
 
-    // ── Step 4: Decrypt the blob locally ─────────────────────────────────────
-    // The secret key from the URL fragment is used here — server never had it.
-    // If the key is wrong, CryptoJS returns an empty string (not an exception).
     let plaintext;
     try {
         const decrypted = CryptoJS.AES.decrypt(encryptedBlob, secretKey);
         plaintext = decrypted.toString(CryptoJS.enc.Utf8);
     } catch {
-        return showError('🔐', 'Decryption Failed',
-            'An error occurred while trying to decrypt this note.',
+        return showError('Decryption failed',
+            'An error occurred while decrypting this note.',
             'The encrypted data may be corrupted.');
     }
 
     if (!plaintext) {
-        return showError('🔐', 'Wrong Key',
-            'Decryption produced no output — the secret key in the URL may be incorrect.',
-            'Ensure the full link (including the #key part) was copied correctly. If this was a burn-on-read note, it has now been consumed.');
+        return showError('Wrong key',
+            'Decryption produced no output. The secret key in the URL may be incorrect.',
+            'Ensure the full link including the #key part was copied correctly.');
     }
 
-    // ── Step 5: Display decrypted content ────────────────────────────────────
     if (contentType === 'file') {
-        // ── File: parse the JSON bundle { fileName, dataUrl } ────────────────
-        // The sender encrypted JSON.stringify({ fileName, dataUrl }) as the payload.
         let fileData;
-        try {
-            fileData = JSON.parse(plaintext);
-        } catch {
-            return showError('📄', 'File Parse Error',
-                'The decrypted content is not a valid file bundle.',
+        try { fileData = JSON.parse(plaintext); }
+        catch {
+            return showError('File parse error',
+                'The decrypted content is not a valid file.',
                 'The file may have been corrupted during encryption.');
         }
         showFileContent(fileData, isOneTime, remainingSeconds);
-
     } else {
-        // ── Text note: display directly ───────────────────────────────────────
         showNoteContent(plaintext, isOneTime, remainingSeconds);
     }
-
 })();
 </script>
 </body>
