@@ -1,30 +1,39 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>LockBox — Create Secure Note</title>
-    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ff4466' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='11' width='18' height='11' rx='2' ry='2'%3E%3C/rect%3E%3Cpath d='M7 11V7a5 5 0 0 1 10 0v4'%3E%3C/path%3E%3C/svg%3E">
+    <link rel="icon" type="image/svg+xml"
+        href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ff4466' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='11' width='18' height='11' rx='2' ry='2'%3E%3C/rect%3E%3Cpath d='M7 11V7a5 5 0 0 1 10 0v4'%3E%3C/path%3E%3C/svg%3E">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.2.0/crypto-js.min.js"></script>
     <style>
         :root {
-            --bg:      #0a0a0a;
+            --bg: #0a0a0a;
             --surface: #111111;
-            --sur2:    #181818;
-            --border:  #2a2a2a;
-            --bh:      #3a3a3a;
-            --red:     #cc2200;
+            --sur2: #181818;
+            --border: #2a2a2a;
+            --bh: #3a3a3a;
+            --red: #cc2200;
             --red-dim: #991a00;
-            --red-bg:  rgba(204,34,0,0.08);
-            --text:    #e0e0e0;
-            --dim:     #666666;
-            --mono:    'Courier New', Courier, monospace;
+            --red-bg: rgba(204, 34, 0, 0.08);
+            --text: #e0e0e0;
+            --dim: #666666;
+            --mono: 'Courier New', Courier, monospace;
         }
 
-        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        *,
+        *::before,
+        *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
 
         /* ── Mobile-first base styles ── */
-        html, body {
+        html,
+        body {
             min-height: 100%;
             background: var(--bg);
             color: var(--text);
@@ -35,7 +44,9 @@
 
         /* ── On desktop only: lock to viewport, no scroll ── */
         @media (min-width: 769px) {
-            html, body {
+
+            html,
+            body {
                 height: 100%;
                 overflow: hidden;
                 font-size: 20px;
@@ -70,7 +81,9 @@
         }
 
         @media (min-width: 769px) {
-            .topbar { padding: 0.9rem 0; }
+            .topbar {
+                padding: 0.9rem 0;
+            }
         }
 
         .logo {
@@ -82,14 +95,24 @@
         }
 
         @media (min-width: 769px) {
-            .logo { font-size: 1rem; }
+            .logo {
+                font-size: 1rem;
+            }
         }
 
-        .logo span { color: var(--red); }
-        .tagline { font-size: 0.7rem; color: var(--dim); }
+        .logo span {
+            color: var(--red);
+        }
+
+        .tagline {
+            font-size: 0.7rem;
+            color: var(--dim);
+        }
 
         @media (max-width: 380px) {
-            .tagline { display: none; }
+            .tagline {
+                display: none;
+            }
         }
 
         /* ── Workspace: single column on mobile, two columns on desktop ── */
@@ -120,22 +143,34 @@
 
         /* ── Right pane ── */
         .pane-right {
-    display: flex;
-    flex-direction: column;
-    gap: 0.85rem; /* Increased gap for better visual breathing room */
-    min-height: 0;
-}
+            display: flex;
+            flex-direction: column;
+            gap: 0.85rem;
+            /* Increased gap for better visual breathing room */
+            min-height: 0;
+        }
 
         @media (min-width: 769px) {
-    .pane-right {
-        overflow-y: auto;
-        padding-right: 4px; /* Space for the thin scrollbar */
-    }
-    /* Smooth scrollbar for the right pane */
-    .pane-right::-webkit-scrollbar { width: 4px; }
-    .pane-right::-webkit-scrollbar-track { background: transparent; }
-    .pane-right::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
-}
+            .pane-right {
+                overflow-y: auto;
+                padding-right: 4px;
+                /* Space for the thin scrollbar */
+            }
+
+            /* Smooth scrollbar for the right pane */
+            .pane-right::-webkit-scrollbar {
+                width: 4px;
+            }
+
+            .pane-right::-webkit-scrollbar-track {
+                background: transparent;
+            }
+
+            .pane-right::-webkit-scrollbar-thumb {
+                background: var(--border);
+                border-radius: 2px;
+            }
+        }
 
         /* ── Tabs ── */
         .tab-row {
@@ -163,15 +198,36 @@
         }
 
         @media (min-width: 769px) {
-            .tab-btn { padding: 0.55rem 0.75rem; }
+            .tab-btn {
+                padding: 0.55rem 0.75rem;
+            }
         }
 
-        .tab-btn:last-child { border-right: none; }
-        .tab-btn.active { background: var(--red-bg); color: var(--red); border-bottom: 2px solid var(--red); }
-        .tab-btn:hover:not(.active) { color: var(--text); background: var(--surface); }
+        .tab-btn:last-child {
+            border-right: none;
+        }
 
-        .tab-panel { display: none; flex: 1; min-height: 0; flex-direction: column; }
-        .tab-panel.active { display: flex; }
+        .tab-btn.active {
+            background: var(--red-bg);
+            color: var(--red);
+            border-bottom: 2px solid var(--red);
+        }
+
+        .tab-btn:hover:not(.active) {
+            color: var(--text);
+            background: var(--surface);
+        }
+
+        .tab-panel {
+            display: none;
+            flex: 1;
+            min-height: 0;
+            flex-direction: column;
+        }
+
+        .tab-panel.active {
+            display: flex;
+        }
 
         /* ── Note field ── */
         .note-field {
@@ -203,6 +259,26 @@
             /* Mobile: fixed min height, user can resize */
             min-height: 180px;
             resize: vertical;
+            scrollbar-width: thin;
+            scrollbar-color: var(--border) transparent;
+        }
+
+        textarea::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        textarea::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        textarea::-webkit-scrollbar-thumb {
+            background: var(--border);
+            border-radius: 2px;
+        }
+
+        textarea::-webkit-scrollbar-thumb {
+            background: var(--border);
+            border-radius: 2px;
         }
 
         /* Desktop: flex fill, no resize handle */
@@ -215,8 +291,13 @@
             }
         }
 
-        textarea:focus { border-color: var(--red); }
-        textarea::placeholder { color: var(--dim); }
+        textarea:focus {
+            border-color: var(--red);
+        }
+
+        textarea::placeholder {
+            color: var(--dim);
+        }
 
         /* ── Drop zone ── */
         .drop-zone {
@@ -233,12 +314,26 @@
         }
 
         @media (min-width: 769px) {
-            .drop-zone { flex: 1; }
+            .drop-zone {
+                flex: 1;
+            }
         }
 
-        .drop-zone:hover, .drop-zone.dragover { border-color: var(--red); background: var(--red-bg); }
-        .drop-zone-text { font-size: 0.82rem; color: var(--dim); line-height: 1.7; }
-        .drop-zone-text strong { color: var(--text); }
+        .drop-zone:hover,
+        .drop-zone.dragover {
+            border-color: var(--red);
+            background: var(--red-bg);
+        }
+
+        .drop-zone-text {
+            font-size: 0.82rem;
+            color: var(--dim);
+            line-height: 1.7;
+        }
+
+        .drop-zone-text strong {
+            color: var(--text);
+        }
 
         .file-chip {
             display: none;
@@ -251,10 +346,33 @@
             flex-shrink: 0;
         }
 
-        .file-chip.visible { display: flex; }
-        .chip-name { font-size: 0.8rem; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .chip-size { font-size: 0.72rem; color: var(--dim); flex-shrink: 0; }
-        .btn-clear { background: none; border: none; color: var(--red); cursor: pointer; padding: 0; font-size: 0.9rem; flex-shrink: 0; }
+        .file-chip.visible {
+            display: flex;
+        }
+
+        .chip-name {
+            font-size: 0.8rem;
+            flex: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .chip-size {
+            font-size: 0.72rem;
+            color: var(--dim);
+            flex-shrink: 0;
+        }
+
+        .btn-clear {
+            background: none;
+            border: none;
+            color: var(--red);
+            cursor: pointer;
+            padding: 0;
+            font-size: 0.9rem;
+            flex-shrink: 0;
+        }
 
         /* ── Right-pane sections ── */
         .section {
@@ -272,10 +390,15 @@
             color: var(--dim);
         }
 
-        .section-body { padding: 0.65rem 0.75rem; }
+        .section-body {
+            padding: 0.65rem 0.75rem;
+        }
 
         /* ── Key input row ── */
-        .key-row { display: flex; gap: 0.4rem; }
+        .key-row {
+            display: flex;
+            gap: 0.4rem;
+        }
 
         input[type="text"] {
             flex: 1;
@@ -292,11 +415,19 @@
         }
 
         @media (min-width: 769px) {
-            input[type="text"] { font-size: 0.88rem; padding: 0.55rem 0.75rem; }
+            input[type="text"] {
+                font-size: 0.88rem;
+                padding: 0.55rem 0.75rem;
+            }
         }
 
-        input[type="text"]:focus { border-color: var(--red); }
-        input::placeholder { color: var(--dim); }
+        input[type="text"]:focus {
+            border-color: var(--red);
+        }
+
+        input::placeholder {
+            color: var(--dim);
+        }
 
         .btn-gen {
             padding: 0.6rem 0.7rem;
@@ -313,7 +444,10 @@
             touch-action: manipulation;
         }
 
-        .btn-gen:hover { border-color: var(--red); color: var(--red); }
+        .btn-gen:hover {
+            border-color: var(--red);
+            color: var(--red);
+        }
 
         .passphrase-reveal {
             display: none;
@@ -327,7 +461,9 @@
             line-height: 1.5;
         }
 
-        .passphrase-reveal.visible { display: block; }
+        .passphrase-reveal.visible {
+            display: block;
+        }
 
         .passphrase-hint {
             display: none;
@@ -336,11 +472,9 @@
             color: var(--dim);
         }
 
-        .passphrase-hint.visible { display: block; }
-
-        /* .strength-bar { height: 2px; margin-top: 0.35rem; background: var(--border); } */
-        /* .strength-fill { height: 100%; width: 0%; background: var(--red); } */
-        /* .strength-label { font-size: 0.66rem; margin-top: 0.2rem; color: var(--dim); min-height: 0.85rem; } */
+        .passphrase-hint.visible {
+            display: block;
+        }
 
         /* ── Toggle row ── */
         .toggle-row {
@@ -349,8 +483,18 @@
             gap: 0.65rem;
         }
 
-        .toggle { position: relative; width: 34px; height: 18px; flex-shrink: 0; }
-        .toggle input { opacity: 0; width: 0; height: 0; }
+        .toggle {
+            position: relative;
+            width: 34px;
+            height: 18px;
+            flex-shrink: 0;
+        }
+
+        .toggle input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
 
         .toggle-slider {
             position: absolute;
@@ -362,14 +506,25 @@
         .toggle-slider::after {
             content: '';
             position: absolute;
-            width: 12px; height: 12px;
+            width: 12px;
+            height: 12px;
             background: #fff;
-            top: 3px; left: 3px;
+            top: 3px;
+            left: 3px;
         }
 
-        .toggle input:checked + .toggle-slider { background: var(--red); }
-        .toggle input:checked + .toggle-slider::after { transform: translateX(16px); }
-        .toggle-label { font-size: 0.78rem; color: var(--dim); }
+        .toggle input:checked+.toggle-slider {
+            background: var(--red);
+        }
+
+        .toggle input:checked+.toggle-slider::after {
+            transform: translateX(16px);
+        }
+
+        .toggle-label {
+            font-size: 0.78rem;
+            color: var(--dim);
+        }
 
         /* ── Timer grid ── */
         .timer-grid {
@@ -380,7 +535,9 @@
 
         /* On very small screens, 2-column timer grid */
         @media (max-width: 380px) {
-            .timer-grid { grid-template-columns: repeat(2, 1fr); }
+            .timer-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
         }
 
         .timer-opt {
@@ -396,32 +553,49 @@
             touch-action: manipulation;
         }
 
-        .timer-opt:hover { border-color: var(--bh); color: var(--text); }
-        .timer-opt.selected { border-color: var(--red); color: var(--red); background: var(--red-bg); }
+        .timer-opt:hover {
+            border-color: var(--bh);
+            color: var(--text);
+        }
+
+        .timer-opt.selected {
+            border-color: var(--red);
+            color: var(--red);
+            background: var(--red-bg);
+        }
 
         /* ── Generate button ── */
         .btn-primary {
-    width: 100%;
-    padding: 0.85rem;
-    border: none;
-    background: var(--red);
-    color: #fff;
-    font-family: var(--mono);
-    font-size: 0.82rem;
-    font-weight: bold;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    cursor: pointer;
-    flex-shrink: 0; /* Prevents the button from being flattened */
-    transition: background 0.2s;
-}
-
-        @media (min-width: 769px) {
-            .btn-primary { padding: 0.7rem; }
+            width: 100%;
+            padding: 0.85rem;
+            border: none;
+            background: var(--red);
+            color: #fff;
+            font-family: var(--mono);
+            font-size: 0.82rem;
+            font-weight: bold;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            cursor: pointer;
+            flex-shrink: 0;
+            /* Prevents the button from being flattened */
+            transition: background 0.2s;
         }
 
-        .btn-primary:hover:not(:disabled) { background: var(--red-dim); }
-        .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+        @media (min-width: 769px) {
+            .btn-primary {
+                padding: 0.7rem;
+            }
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            background: var(--red-dim);
+        }
+
+        .btn-primary:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
 
         /* ── Error box ── */
         .error-box {
@@ -433,23 +607,25 @@
             color: var(--red);
         }
 
-        .error-box.visible { display: block; }
+        .error-box.visible {
+            display: block;
+        }
 
         /* ── Result box ── */
         .result-box {
-    display: none;
-    border: 1px solid var(--border);
-    background: var(--surface);
-    margin-top: 0.5rem; /* Pushes away from the Generate Button */
-    margin-bottom: 1.5rem; /* Prevents sticking to the bottom of the screen */
-    animation: slideIn 0.3s ease-out; /* Professional entrance */
-}
-@keyframes slideIn {
-    from { opacity: 0; transform: translateY(10px); }
-    to { opacity: 1; transform: translateY(0); }
-}
+            display: none;
+            border: 1px solid var(--border);
+            background: var(--surface);
+            margin-top: 0.5rem;
+            /* Pushes away from the Generate Button */
+            margin-bottom: 1.5rem;
+            /* Prevents sticking to the bottom of the screen */
+            /* animation: slideIn 0.3s ease-out; Professional entrance */
+        }
 
-        .result-box.visible { display: block; }
+        .result-box.visible {
+            display: block;
+        }
 
         .result-head {
             padding: 0.4rem 0.75rem;
@@ -461,22 +637,24 @@
             color: var(--dim);
         }
 
-        .result-body { padding: 0.65rem 0.75rem; }
+        .result-body {
+            padding: 0.65rem 0.75rem;
+        }
 
         .result-link {
-    font-size: 0.74rem;
-    color: var(--text);
-    /* Essential: handles long strings without breaking layout */
-    word-wrap: break-word;
-    overflow-wrap: anywhere; 
-    line-height: 1.6;
-    padding: 0.75rem;
-    background: var(--sur2);
-    border: 1px solid var(--border);
-    border-left: 3px solid var(--red);
-    margin-bottom: 0.75rem;
-    user-select: all;
-}
+            font-size: 0.74rem;
+            color: var(--text);
+            /* Essential: handles long strings without breaking layout */
+            word-wrap: break-word;
+            overflow-wrap: anywhere;
+            line-height: 1.6;
+            padding: 0.75rem;
+            background: var(--sur2);
+            border: 1px solid var(--border);
+            border-left: 3px solid var(--red);
+            margin-bottom: 0.75rem;
+            user-select: all;
+        }
 
         .btn-copy {
             width: 100%;
@@ -494,10 +672,15 @@
         }
 
         @media (min-width: 769px) {
-            .btn-copy { padding: 0.5rem; }
+            .btn-copy {
+                padding: 0.5rem;
+            }
         }
 
-        .btn-copy:hover { border-color: var(--red); color: var(--red); }
+        .btn-copy:hover {
+            border-color: var(--red);
+            color: var(--red);
+        }
 
         .result-meta {
             font-size: 0.7rem;
@@ -521,377 +704,363 @@
         }
 
         @media (min-width: 769px) {
-            .btn-reset { padding: 0.5rem; }
+            .btn-reset {
+                padding: 0.5rem;
+            }
         }
 
-        .btn-reset:hover { border-color: var(--bh); color: var(--text); }
+        .btn-reset:hover {
+            border-color: var(--bh);
+            color: var(--text);
+        }
 
         /* ── Safe area insets for notched phones ── */
         @supports (padding-bottom: env(safe-area-inset-bottom)) {
-            .shell { padding-bottom: env(safe-area-inset-bottom); }
+            .shell {
+                padding-bottom: env(safe-area-inset-bottom);
+            }
         }
     </style>
 </head>
+
 <body>
-<div class="shell">
+    <div class="shell">
 
-    <!-- Top bar -->
-    <header class="topbar">
-        <div class="logo">Lock<span>Box</span></div>
-        <div class="tagline">Zero-knowledge encrypted note sharing</div>
-    </header>
+        <!-- Top bar -->
+        <header class="topbar">
+            <div class="logo">Lock<span>Box</span></div>
+            <div class="tagline">Zero-knowledge encrypted note sharing</div>
+        </header>
 
-    <!-- Two-column workspace (single column on mobile) -->
-    <div class="workspace">
+        <!-- Two-column workspace (single column on mobile) -->
+        <div class="workspace">
 
-        <!-- ── LEFT: Note / File input ── -->
-        <div class="pane-left">
+            <!-- ── LEFT: Note / File input ── -->
+            <div class="pane-left">
 
-            <!-- Tabs -->
-            <div class="tab-row">
-                <button class="tab-btn active" onclick="switchTab('note', this)">Text Note</button>
-                <button class="tab-btn"        onclick="switchTab('file', this)">File Attachment</button>
-            </div>
-
-            <!-- Note tab -->
-            <div id="tab-note" class="tab-panel active">
-                <div class="note-field">
-                    <div class="field-label">Secret note</div>
-                    <textarea id="noteText"
-                        placeholder="Type your confidential message here.&#10;&#10;It will be AES-256 encrypted entirely in your browser before reaching the server. The server never sees the plaintext."></textarea>
+                <!-- Tabs -->
+                <div class="tab-row">
+                    <button class="tab-btn active" onclick="switchTab('note', this)">Text Note</button>
+                    <button class="tab-btn" onclick="switchTab('file', this)">File Attachment</button>
                 </div>
-            </div>
 
-            <!-- File tab -->
-            <div id="tab-file" class="tab-panel">
-                <div class="note-field">
-                    <div class="field-label">File to encrypt</div>
-                    <div class="drop-zone" id="dropZone"
-                         onclick="document.getElementById('fileInput').click()"
-                         ondragover="onDragOver(event)"
-                         ondragleave="onDragLeave()"
-                         ondrop="onDrop(event)">
-                        <div class="drop-zone-text">
-                            <strong>Tap to browse</strong> or drag a file here<br/>
-                            PDF, images, text — max 5 MB
+                <!-- Note tab -->
+                <div id="tab-note" class="tab-panel active">
+                    <div class="note-field">
+                        <div class="field-label">Secret note</div>
+                        <textarea id="noteText"
+                            placeholder="Type your confidential message here.&#10;&#10;It will be AES-256 encrypted entirely in your browser before reaching the server. The server never sees the plaintext."></textarea>
+                    </div>
+                </div>
+
+                <!-- File tab -->
+                <div id="tab-file" class="tab-panel">
+                    <div class="note-field">
+                        <div class="field-label">File to encrypt</div>
+                        <div class="drop-zone" id="dropZone" onclick="document.getElementById('fileInput').click()"
+                            ondragover="onDragOver(event)" ondragleave="onDragLeave()" ondrop="onDrop(event)">
+                            <div class="drop-zone-text">
+                                <strong>Tap to browse</strong> or drag a file here<br />
+                                PDF, images, text — max 5 MB
+                            </div>
+                        </div>
+                        <input type="file" id="fileInput" style="display:none"
+                            onchange="onFileSelected(this.files[0])" />
+                        <div class="file-chip" id="fileChip">
+                            <span class="chip-name" id="chipName"></span>
+                            <span class="chip-size" id="chipSize"></span>
+                            <button class="btn-clear" onclick="clearFile()">x</button>
                         </div>
                     </div>
-                    <input type="file" id="fileInput" style="display:none" onchange="onFileSelected(this.files[0])" />
-                    <div class="file-chip" id="fileChip">
-                        <span class="chip-name" id="chipName"></span>
-                        <span class="chip-size" id="chipSize"></span>
-                        <button class="btn-clear" onclick="clearFile()">x</button>
-                    </div>
                 </div>
+
             </div>
 
-        </div>
+            <!-- ── RIGHT: Options + Generate + Result ── -->
+            <div class="pane-right">
 
-        <!-- ── RIGHT: Options + Generate + Result ── -->
-        <div class="pane-right">
+                <div id="optionsPanel" style="display:flex; flex-direction:column; gap:0.3rem;">
 
-            <!-- Secret key -->
-            <div class="section">
-                <div class="section-head">Secret Key</div>
-                <div class="section-body">
-                    <div class="key-row">
-                        <input type="text" id="secretKey"
-                               placeholder="Passphrase or click Generate"
-                               autocomplete="off" />
-                               <!-- oninput="evaluateStrength(this.value)" /> -->
-                        <button class="btn-gen" onclick="generatePassphrase()">Generate</button>
+
+                    <!-- Secret key -->
+                    <div class="section">
+                        <div class="section-head">Secret Key</div>
+                        <div class="section-body">
+                            <div class="key-row">
+                                <input type="text" id="secretKey" placeholder="Generate Secret Key"
+                                    autocomplete="off" />
+                                <!-- oninput="evaluateStrength(this.value)" /> -->
+                                <button class="btn-gen" onclick="generatePassphrase()">Generate</button>
+                            </div>
+                            <div class="passphrase-reveal" id="passphraseReveal">
+                                <span id="passphraseText"></span>
+                            </div>
+                            <div class="passphrase-hint" id="passphraseHint">
+                                <!-- Embedded in the link. Anyone with the full link can decrypt. -->
+                            </div>
+                            
+                        </div>
                     </div>
-                    <div class="passphrase-reveal" id="passphraseReveal">
-                        <span id="passphraseText"></span>
+
+                    <!-- Burn on read -->
+                    <div class="section">
+                        <div class="section-head">Burn on Read</div>
+                        <div class="section-body">
+                            <div class="toggle-row">
+                                <label class="toggle">
+                                    <input type="checkbox" id="isOneTime" checked />
+                                    <span class="toggle-slider"></span>
+                                </label>
+                                <span class="toggle-label">Delete from server after first view</span>
+                            </div>
+                        </div>
                     </div>
-                    <div class="passphrase-hint" id="passphraseHint">
-                        <!-- Embedded in the link. Anyone with the full link can decrypt. -->
+
+                    <!-- Auto-wipe timer -->
+                    <div class="section">
+                        <div class="section-head">Auto-wipe Timer</div>
+                        <div class="section-body">
+                            <div class="timer-grid">
+                                <div class="timer-opt selected" onclick="selectTimer(null, this)">No timer</div>
+                                <div class="timer-opt" onclick="selectTimer(30, this)">30 sec</div>
+                                <div class="timer-opt" onclick="selectTimer(60, this)">1 min</div>
+                                <div class="timer-opt" onclick="selectTimer(86400, this)">24 hrs</div>
+                            </div>
+                        </div>
                     </div>
-                    <!-- <div class="strength-bar"><div class="strength-fill" id="strengthFill"></div></div> -->
-                    <!-- <div class="strength-label" id="strengthLabel"></div> -->
+
                 </div>
-            </div>
 
-            <!-- Burn on read -->
-            <div class="section">
-                <div class="section-head">Burn on Read</div>
-                <div class="section-body">
-                    <div class="toggle-row">
-                        <label class="toggle">
-                            <input type="checkbox" id="isOneTime" checked />
-                            <span class="toggle-slider"></span>
-                        </label>
-                        <span class="toggle-label">Delete from server after first view</span>
+
+                <!-- Error -->
+                <div class="error-box" id="errorBox"></div>
+
+                <!-- Generate button -->
+                <button class="btn-primary" id="generateBtn" onclick="generateLink()">
+                    Generate Secure Link
+                </button>
+
+                <!-- Result -->
+                <div class="result-box" id="resultBox">
+                    <div class="result-head">Secure link — share this</div>
+                    <div class="result-body">
+                        <div class="result-link" id="resultLink"></div>
+                        <button class="btn-copy" onclick="copyLink()">Copy to clipboard</button>
+                        <div class="result-meta" id="resultMeta"></div>
+                        <button class="btn-reset" onclick="resetForm()">Create another note</button>
                     </div>
                 </div>
+
             </div>
-
-            <!-- Auto-wipe timer -->
-            <div class="section">
-                <div class="section-head">Auto-wipe Timer</div>
-                <div class="section-body">
-                    <div class="timer-grid">
-                        <div class="timer-opt selected" onclick="selectTimer(null, this)">No timer</div>
-                        <div class="timer-opt" onclick="selectTimer(30, this)">30 sec</div>
-                        <div class="timer-opt" onclick="selectTimer(60, this)">1 min</div>
-                        <div class="timer-opt" onclick="selectTimer(86400, this)">24 hrs</div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Error -->
-            <div class="error-box" id="errorBox"></div>
-
-            <!-- Generate button -->
-            <button class="btn-primary" id="generateBtn" onclick="generateLink()">
-                Generate Secure Link
-            </button>
-
-            <!-- Result -->
-            <div class="result-box" id="resultBox">
-                <div class="result-head">Secure link — share this</div>
-                <div class="result-body">
-                    <div class="result-link" id="resultLink"></div>
-                    <button class="btn-copy" onclick="copyLink()">Copy to clipboard</button>
-                    <div class="result-meta" id="resultMeta"></div>
-                    <button class="btn-reset" onclick="resetForm()">Create another note</button>
-                </div>
-            </div>
-
         </div>
     </div>
-</div>
 
-<script>
-let currentTab    = 'note';
-let selectedFile  = null;
-let selectedTimer = null;
+    <script>
+        let currentTab = 'note';
+        let selectedFile = null;
+        let selectedTimer = null;
 
-function switchTab(tab, btn) {
-    currentTab = tab;
-    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    document.querySelectorAll('.tab-panel').forEach(p => {
-        p.classList.remove('active');
-        p.style.display = 'none';
-    });
-    const panel = document.getElementById('tab-' + tab);
-    panel.classList.add('active');
-    panel.style.display = 'flex';
-    if (tab === 'note') clearFile();
-}
-
-function selectTimer(seconds, btn) {
-    selectedTimer = seconds;
-    document.querySelectorAll('.timer-opt').forEach(o => o.classList.remove('selected'));
-    btn.classList.add('selected');
-}
-
-function onFileSelected(file) {
-    if (!file) return;
-    if (file.size > 5 * 1024 * 1024) { showError('File too large. Maximum size is 5 MB.'); return; }
-    selectedFile = file;
-    document.getElementById('chipName').textContent = file.name;
-    document.getElementById('chipSize').textContent = formatBytes(file.size);
-    document.getElementById('fileChip').classList.add('visible');
-}
-
-function clearFile() {
-    selectedFile = null;
-    document.getElementById('fileInput').value = '';
-    document.getElementById('fileChip').classList.remove('visible');
-}
-
-function onDragOver(e) { e.preventDefault(); document.getElementById('dropZone').classList.add('dragover'); }
-function onDragLeave()  { document.getElementById('dropZone').classList.remove('dragover'); }
-function onDrop(e) {
-    e.preventDefault();
-    document.getElementById('dropZone').classList.remove('dragover');
-    const file = e.dataTransfer.files[0];
-    if (file) onFileSelected(file);
-}
-
-function formatBytes(b) {
-    if (b < 1024)    return b + ' B';
-    if (b < 1048576) return (b / 1024).toFixed(1) + ' KB';
-    return (b / 1048576).toFixed(2) + ' MB';
-}
-
-function readFileAsBase64(file) {
-    return new Promise((res, rej) => {
-        const r = new FileReader();
-        r.onload  = () => res(r.result);
-        r.onerror = () => rej(new Error('Failed to read file.'));
-        r.readAsDataURL(file);
-    });
-}
-
-function generatePassphrase() {
-    const charset = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$%^&*';
-    const arr = new Uint8Array(20);
-    crypto.getRandomValues(arr);
-    const passphrase = Array.from(arr).map(b => charset[b % charset.length]).join('');
-    document.getElementById('secretKey').value = passphrase;
-    document.getElementById('passphraseText').textContent = passphrase;
-    document.getElementById('passphraseReveal').classList.add('visible');
-    document.getElementById('passphraseHint').classList.add('visible');
-}
-
-// function evaluateStrength(key) {
-//     const fill  = document.getElementById('strengthFill');
-//     const label = document.getElementById('strengthLabel');
-//     if (key !== document.getElementById('passphraseText').textContent) {
-//         document.getElementById('passphraseReveal').classList.remove('visible');
-//         document.getElementById('passphraseHint').classList.remove('visible');
-//     }
-//     if (!key) { fill.style.width = '0%'; label.textContent = ''; return; }
-//     let score = 0;
-//     if (key.length >= 8)          score++;
-//     if (key.length >= 14)         score++;
-//     if (/[A-Z]/.test(key))        score++;
-//     if (/[0-9]/.test(key))        score++;
-//     if (/[^A-Za-z0-9]/.test(key)) score++;
-//     const levels = [
-//         { pct:'20%', color:'#cc2200', text:'Too weak'    },
-//         { pct:'40%', color:'#cc5500', text:'Weak'        },
-//         { pct:'60%', color:'#aa8800', text:'Fair'        },
-//         { pct:'80%', color:'#557700', text:'Strong'      },
-//         { pct:'100%',color:'#226600', text:'Very strong' },
-//     ];
-//     const lvl = levels[Math.min(score, 4)];
-//     fill.style.width      = lvl.pct;
-//     fill.style.background = lvl.color;
-//     label.textContent     = lvl.text;
-//     label.style.color     = lvl.color;
-// }
-
-function showError(msg) {
-    const box = document.getElementById('errorBox');
-    box.textContent = 'Error: ' + msg;
-    box.classList.add('visible');
-}
-
-function hideError() { document.getElementById('errorBox').classList.remove('visible'); }
-
-function resetForm() {
-    document.getElementById('noteText').value    = '';
-    document.getElementById('secretKey').value   = '';
-    document.getElementById('resultBox').classList.remove('visible');
-    document.getElementById('passphraseReveal').classList.remove('visible');
-    document.getElementById('passphraseHint').classList.remove('visible');
-    // document.getElementById('strengthFill').style.width = '0%';
-    // document.getElementById('strengthLabel').textContent = '';
-    document.getElementById('generateBtn').style.display = 'block';
-    clearFile();
-    hideError();
-}
-
-async function generateLink() {
-    hideError();
-    const secretKey = document.getElementById('secretKey').value.trim();
-    const isOneTime = document.getElementById('isOneTime').checked;
-    const btn       = document.getElementById('generateBtn');
-
-    if (!secretKey || secretKey.length < 4) {
-        return showError('Enter a secret key (min 4 characters), or click Generate.');
-    }
-    if (currentTab === 'note' && !document.getElementById('noteText').value.trim()) {
-        return showError('Please enter a note before generating a link.');
-    }
-    if (currentTab === 'file' && !selectedFile) {
-        return showError('Please select a file to encrypt.');
-    }
-
-    btn.disabled    = true;
-    btn.textContent = 'Encrypting & uploading...';
-
-    try {
-        let encryptedBlob;
-        const contentType = currentTab;
-
-        if (contentType === 'note') {
-            encryptedBlob = CryptoJS.AES.encrypt(
-                document.getElementById('noteText').value.trim(), secretKey
-            ).toString();
-        } else {
-            const dataUrl = await readFileAsBase64(selectedFile);
-            const payload = JSON.stringify({ fileName: selectedFile.name, dataUrl });
-            encryptedBlob = CryptoJS.AES.encrypt(payload, secretKey).toString();
+        function switchTab(tab, btn) {
+            currentTab = tab;
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            document.querySelectorAll('.tab-panel').forEach(p => {
+                p.classList.remove('active');
+                // p.style.display = 'none';
+            });
+            const panel = document.getElementById('tab-' + tab);
+            panel.classList.add('active');
+            // panel.style.display = 'flex';
+            if (tab === 'note') clearFile();
         }
 
-        const response = await fetch('/api/notes', {
-            method:  'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                encryptedBlob,
-                isOneTime,
-                isFile:        contentType === 'file',
-                expirySeconds: selectedTimer,
-            }),
-        });
-
-        if (!response.ok) {
-            const err = await response.json().catch(() => ({}));
-            throw new Error(err.error || `Server error (${response.status})`);
+        function selectTimer(seconds, btn) {
+            selectedTimer = seconds;
+            document.querySelectorAll('.timer-opt').forEach(o => o.classList.remove('selected'));
+            btn.classList.add('selected');
         }
 
-        const data  = await response.json();
-        const base  = `${window.location.origin}/view.html`;
-        let   query = `?id=${data.noteId}&type=${contentType}`;
-        if (selectedTimer) query += `&timer=${selectedTimer}`;
-        const shareUrl = `${base}${query}#${encodeURIComponent(secretKey)}`;
+        function onFileSelected(file) {
+            if (!file) return;
+            if (file.size > 5 * 1024 * 1024) { showError('File too large. Maximum size is 5 MB.'); return; }
+            selectedFile = file;
+            document.getElementById('chipName').textContent = file.name;
+            document.getElementById('chipSize').textContent = formatBytes(file.size);
+            document.getElementById('fileChip').classList.add('visible');
+        }
 
-        document.getElementById('resultLink').textContent = shareUrl;
+        function clearFile() {
+            selectedFile = null;
+            document.getElementById('fileInput').value = '';
+            document.getElementById('fileChip').classList.remove('visible');
+        }
 
-        const lines = [];
-        if (isOneTime)              lines.push('Burn-on-read: deleted after first view.');
-        if (selectedTimer)          lines.push(`Auto-wipe: ${formatTimer(selectedTimer)}.`);
-        if (contentType === 'file') lines.push(`File: "${selectedFile.name}"`);
-        if (!isOneTime && !selectedTimer) lines.push('Persistent: can be viewed multiple times.');
-        document.getElementById('resultMeta').innerHTML = lines.join('<br/>');
+        function onDragOver(e) { e.preventDefault(); document.getElementById('dropZone').classList.add('dragover'); }
+        function onDragLeave() { document.getElementById('dropZone').classList.remove('dragover'); }
+        function onDrop(e) {
+            e.preventDefault();
+            document.getElementById('dropZone').classList.remove('dragover');
+            const file = e.dataTransfer.files[0];
+            if (file) onFileSelected(file);
+        }
 
-        document.getElementById('resultBox').classList.add('visible');
+        function formatBytes(b) {
+            if (b < 1024) return b + ' B';
+            if (b < 1048576) return (b / 1024).toFixed(1) + ' KB';
+            return (b / 1048576).toFixed(2) + ' MB';
+        }
 
-        // Scroll result into view on mobile
-        // Professional scroll handling
-setTimeout(() => {
-    document.getElementById('resultBox').scrollIntoView({ 
-        behavior: 'smooth', 
-        block: 'nearest' // 'nearest' prevents the whole page from jumping unnecessarily
-    });
-}, 50); // Small delay to allow the DOM to render the block
+        function readFileAsBase64(file) {
+            return new Promise((res, rej) => {
+                const r = new FileReader();
+                r.onload = () => res(r.result);
+                r.onerror = () => rej(new Error('Failed to read file.'));
+                r.readAsDataURL(file);
+            });
+        }
 
-    } catch (err) {
-        showError(err.message || 'An unexpected error occurred.');
-    } finally {
-        btn.disabled    = false;
-        btn.textContent = 'Generate Secure Link';
-    }
-}
+        function generatePassphrase() {
+            const charset = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$%^&*';
+            const arr = new Uint8Array(20);
+            crypto.getRandomValues(arr);
+            const passphrase = Array.from(arr).map(b => charset[b % charset.length]).join('');
+            document.getElementById('secretKey').value = passphrase;
+            document.getElementById('passphraseText').textContent = passphrase;
+            document.getElementById('passphraseReveal').classList.add('visible');
+            document.getElementById('passphraseHint').classList.add('visible');
+        }
 
-function formatTimer(s) {
-    if (s === 30)    return '30 seconds';
-    if (s === 60)    return '1 minute';
-    if (s === 86400) return '24 hours';
-    return s + 's';
-}
+        function showError(msg) {
+            const box = document.getElementById('errorBox');
+            box.textContent = 'Error: ' + msg;
+            box.classList.add('visible');
+        }
 
-async function copyLink() {
-    const link = document.getElementById('resultLink').textContent;
-    try {
-        await navigator.clipboard.writeText(link);
-        const btn = document.querySelector('.btn-copy');
-        btn.textContent = 'Copied!';
-        setTimeout(() => { btn.textContent = 'Copy to clipboard'; }, 2000);
-    } catch {
-        const el = document.createElement('textarea');
-        el.value = link;
-        document.body.appendChild(el);
-        el.select();
-        document.execCommand('copy');
-        document.body.removeChild(el);
-    }
-}
-</script>
+        function hideError() { document.getElementById('errorBox').classList.remove('visible'); }
+
+        function resetForm() {
+            document.getElementById('noteText').value = '';
+            document.getElementById('secretKey').value = '';
+            document.getElementById('resultBox').classList.remove('visible');
+            document.getElementById('passphraseReveal').classList.remove('visible');
+            document.getElementById('passphraseHint').classList.remove('visible');
+            document.getElementById('optionsPanel').style.display = 'flex';
+            clearFile();
+            hideError();
+        }
+
+        async function generateLink() {
+            hideError();
+            const secretKey = document.getElementById('secretKey').value.trim();
+            const isOneTime = document.getElementById('isOneTime').checked;
+            const btn = document.getElementById('generateBtn');
+
+            if (!secretKey || secretKey.length < 4) {
+                return showError('Enter a secret key (min 4 characters), or click Generate.');
+            }
+            if (currentTab === 'note' && !document.getElementById('noteText').value.trim()) {
+                return showError('Please enter a note before generating a link.');
+            }
+            if (currentTab === 'file' && !selectedFile) {
+                return showError('Please select a file to encrypt.');
+            }
+
+            btn.disabled = true;
+            document.getElementById('optionsPanel').style.display = 'none';
+            btn.textContent = 'Encrypting & uploading...';
+
+            try {
+                let encryptedBlob;
+                const contentType = currentTab;
+
+                if (contentType === 'note') {
+                    encryptedBlob = CryptoJS.AES.encrypt(
+                        document.getElementById('noteText').value.trim(), secretKey
+                    ).toString();
+                } else {
+                    const dataUrl = await readFileAsBase64(selectedFile);
+                    const safeName = selectedFile.name.replace(/[^a-zA-Z0-9.\-_() ]/g, '_'); // sanitize filename
+                    const payload = JSON.stringify({ fileName: safeName, dataUrl });
+                    encryptedBlob = CryptoJS.AES.encrypt(payload, secretKey).toString();
+                }
+
+                const response = await fetch('/api/notes', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        encryptedBlob,
+                        isOneTime,
+                        isFile: contentType === 'file',
+                        expirySeconds: selectedTimer,
+                    }),
+                });
+
+                if (!response.ok) {
+                    const err = await response.json().catch(() => ({}));
+                    throw new Error(err.error || `Server error (${response.status})`);
+                }
+
+                const data = await response.json();
+                const base = `${window.location.origin}/view.html`;
+                let query = `?id=${data.noteId}&type=${contentType}`;
+                if (selectedTimer) query += `&timer=${selectedTimer}`;
+                const shareUrl = `${base}${query}#${encodeURIComponent(secretKey)}`;
+
+                document.getElementById('resultLink').textContent = shareUrl;
+
+                const lines = [];
+                if (isOneTime) lines.push('Burn-on-read: deleted after first view.');
+                if (selectedTimer) lines.push(`Auto-wipe: ${formatTimer(selectedTimer)}.`);
+                let safeName = '';
+                if (contentType === 'file') {
+                    safeName = selectedFile.name.replace(/[^a-zA-Z0-9.\-_() ]/g, '_');
+                    lines.push(`File: "${safeName}"`);   // ← this line was missing
+                }
+                if (!isOneTime && !selectedTimer) lines.push('Persistent: can be viewed multiple times.');
+                document.getElementById('resultMeta').innerHTML = lines.join('<br/>');
+
+                document.getElementById('resultBox').classList.add('visible');
+
+                // Scroll result into view on mobile
+                // Professional scroll handling
+                if (window.innerWidth < 769) {
+                    setTimeout(() => {
+                        document.getElementById('resultBox').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                    }, 50);
+                } // Small delay to allow the DOM to render the block
+
+            } catch (err) {
+                showError(err.message || 'An unexpected error occurred.');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Generate Secure Link';
+            }
+        }
+
+        function formatTimer(s) {
+            if (s === 30) return '30 seconds';
+            if (s === 60) return '1 minute';
+            if (s === 86400) return '24 hours';
+            return s + 's';
+        }
+
+        async function copyLink() {
+            const link = document.getElementById('resultLink').textContent;
+            try {
+                await navigator.clipboard.writeText(link);
+                const btn = document.querySelector('.btn-copy');
+                btn.textContent = 'Copied!';
+                setTimeout(() => { btn.textContent = 'Copy to clipboard'; }, 2000);
+            } catch {
+                const el = document.createElement('textarea');
+                el.value = link;
+                document.body.appendChild(el);
+                el.select();
+                document.execCommand('copy');
+                document.body.removeChild(el);
+            }
+        }
+    </script>
 </body>
+
 </html>
