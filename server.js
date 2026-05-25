@@ -1,16 +1,3 @@
-// =============================================================================
-// LockBox - server.js
-// Zero-Knowledge Note Sharing Platform - Backend API
-//
-// Security Architecture:
-//   - The server ONLY stores encrypted ciphertext blobs.
-//   - The secret key used to encrypt/decrypt NEVER travels to this server.
-//   - The key lives exclusively in the URL fragment (#), which browsers never
-//     include in HTTP requests. This guarantees zero-knowledge on the server.
-//   - Burn-on-Read: notes are deleted from the DB before the response is sent,
-//     ensuring each note can only be read once.
-// =============================================================================
-
 'use strict';
 
 const express = require('express');
