@@ -4,10 +4,14 @@
   "description": "LockBox - Zero-Knowledge E2EE Note Sharing Platform Backend",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js",
-    "dev": "nodemon server.js"
+    "devStart": "nodemon server.js"
   },
-  "keywords": ["e2ee", "zero-knowledge", "encryption", "notes"],
+  "keywords": [
+    "e2ee",
+    "zero-knowledge",
+    "encryption",
+    "notes"
+  ],
   "author": "",
   "license": "MIT",
   "dependencies": {
@@ -17,6 +21,6 @@
     "mssql": "^11.0.1"
   },
   "devDependencies": {
-    "nodemon": "^3.1.4"
+    "nodemon": "^3.1.14"
   }
 }
