@@ -7,7 +7,8 @@
     <title>LockBox — Create Secure Note</title>
     <link rel="icon" type="image/svg+xml"
         href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ff4466' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='11' width='18' height='11' rx='2' ry='2'%3E%3C/rect%3E%3Cpath d='M7 11V7a5 5 0 0 1 10 0v4'%3E%3C/path%3E%3C/svg%3E">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.2.0/crypto-js.min.js"></script>
+    <!-- <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.2.0/crypto-js.min.js"></script> -->
+
     <link rel="stylesheet" href="index.css">
 </head>
 
@@ -28,8 +29,9 @@
 
                 <!-- Tabs -->
                 <div class="tab-row">
-                    <button class="tab-btn active" onclick="switchTab('note', this)">Text Note</button>
-                    <button class="tab-btn" onclick="switchTab('file', this)">File Attachment</button>
+                    <button class="tab-btn active" data-tab="note" onclick="switchTab('note')">Text Note</button>
+                    <button class="tab-btn" data-tab="file" onclick="switchTab('file')">File Attachment</button>
+
                 </div>
 
                 <!-- Note tab -->
@@ -86,7 +88,7 @@
                             <div class="passphrase-hint" id="passphraseHint">
                                 <!-- Embedded in the link. Anyone with the full link can decrypt. -->
                             </div>
-                            
+
                         </div>
                     </div>
 
@@ -109,10 +111,11 @@
                         <div class="section-head">Auto-wipe Timer</div>
                         <div class="section-body">
                             <div class="timer-grid">
-                                <div class="timer-opt selected" onclick="selectTimer(null, this)">No timer</div>
-                                <div class="timer-opt" onclick="selectTimer(30, this)">30 sec</div>
-                                <div class="timer-opt" onclick="selectTimer(60, this)">1 min</div>
-                                <div class="timer-opt" onclick="selectTimer(86400, this)">24 hrs</div>
+                                <div class="timer-opt selected" data-timer="null" onclick="selectTimer(null)">No timer
+                                </div>
+                                <div class="timer-opt" data-timer="30" onclick="selectTimer(30)">30 sec</div>
+                                <div class="timer-opt" data-timer="60" onclick="selectTimer(60)">1 min</div>
+                                <div class="timer-opt" data-timer="86400" onclick="selectTimer(86400)">24 hrs</div>
                             </div>
                         </div>
                     </div>
@@ -143,7 +146,7 @@
         </div>
     </div>
 
-<script src="script.js"></script>
+    <script src="script.js"></script>
 </body>
 
 </html>
