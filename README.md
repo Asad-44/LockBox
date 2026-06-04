@@ -1,6 +1,6 @@
 # LockBox — Zero-Knowledge E2EE Note Sharing Platform
 
-A full-stack cybersecurity-focused web application for sharing encrypted notes and files. Notes are encrypted entirely in the browser before reaching the server — the server never sees plaintext data, and the decryption key never leaves the user's device.
+A full-stack web application for sharing encrypted notes and files. Notes are encrypted entirely in the browser before reaching the server — the server never sees plaintext data, and the decryption key never leaves the user's device.
 
 ---
 
@@ -12,12 +12,14 @@ LockBox allows users to create secret notes or encrypt files and share them via 
 
 ## Features
 
-- **AES-256 Client-Side Encryption** — All encryption and decryption happens in the browser using CryptoJS. The server is never involved in the cryptographic process.
+- **AES-256-GCM Client-Side Encryption** — All encryption and decryption happens in the browser using the native Web Crypto API (`window.crypto.subtle`). AES-GCM is authenticated encryption — tampered ciphertext is rejected immediately rather than silently producing garbage output.
+- **PBKDF2 Key Derivation** — Passphrases are never used directly as keys. The Web Crypto API derives a 256-bit AES key via PBKDF2-SHA256 (200,000 iterations) with a random 16-byte salt, making brute-force attacks significantly harder.
 - **Zero-Knowledge Architecture** — The secret key is embedded in the URL fragment (`#`). Browsers never include the fragment in HTTP requests, making it physically impossible for the server to receive it.
 - **Burn-on-Read** — Notes are permanently deleted from the database before the server sends the response, ensuring one-time access.
 - **Auto-Wipe Timer** — The sender can set a viewer-side timer (30 seconds, 1 minute, or 24 hours). When the countdown expires, the decrypted content is wiped from the viewer's screen and cannot be recovered.
-- **File Encryption** — Encrypt and share files (PDFs, images, text files up to 5 MB). Files are base64-encoded, bundled with their filename, and AES-256 encrypted before upload. The server has no way to identify whether a blob is text or a file.
+- **File Encryption** — Encrypt and share files (PDFs, images, text files up to 5 MB). Files are read as `ArrayBuffer` and encrypted as raw binary — no base64 encoding overhead. Encrypted data is uploaded as `multipart/form-data`, keeping memory usage low even on mobile devices.
 - **Passphrase Generator** — Generates a cryptographically secure 20-character random passphrase using `crypto.getRandomValues()` — the same API browsers use for TLS key generation.
+- **State-Driven UI** — The create form uses a centralized state object with a single `render()` function. All UI updates flow through `setState()`, making the interface predictable and easy to extend.
 - **SQL Injection Prevention** — All database queries use parameterized inputs via the `mssql` driver.
 - **Background Expiry Cleanup** — A server-side job runs every 60 seconds to purge expired notes that were never viewed.
 
@@ -28,7 +30,7 @@ LockBox allows users to create secret notes or encrypt files and share them via 
 | Layer | Technology |
 |---|---|
 | Frontend | HTML5, CSS3, Vanilla JavaScript |
-| Encryption | CryptoJS 4.2 (AES-256) |
+| Encryption | Web Crypto API — AES-256-GCM + PBKDF2-SHA256 |
 | Backend | Node.js, Express.js |
 | Database | Microsoft SQL Server (SSMS) |
 | DB Driver | mssql (npm) |
@@ -46,10 +48,12 @@ Project/
 ├── setup.sql           # Database and table creation script
 ├── README.md
 └── public/
-    ├── index.html      # Note creation page
-    ├── view.html       # Note viewing and decryption page
-    ├── istyle.css      # Stylesheet (separated from HTML)
-    └── script.js       # Client-side logic (separated from HTML)
+    ├── index.css      
+    ├── index.html       
+    ├── script.js      
+    ├── view.css 
+    ├── view.html        
+    
 ```
 
 ---
@@ -119,6 +123,7 @@ Open **http://localhost:3000** in your browser.
 ## Security Notes
 
 - The decryption key is never logged, stored, or transmitted to the server under any circumstances
+- AES-256-GCM authentication means a wrong key or any tampering with the ciphertext is detected immediately — no silent decryption failures
 - Burn-on-read deletion happens before the server response is sent, preventing race conditions
 - Filenames are sanitized before encryption to prevent path traversal attacks
 - All SQL queries use parameterized statements — SQL injection is not possible
@@ -128,7 +133,6 @@ Open **http://localhost:3000** in your browser.
 
 ## Future Improvements
 
-- Migrate encryption from CryptoJS to the native Web Crypto API (`crypto.subtle`) for AES-256-GCM authenticated encryption
 - Refactor `server.js` into a layered MVC architecture (config/, routes/, controllers/, services/, middleware/)
 - Add rate limiting via `express-rate-limit`
 - Add unit tests for encryption and API logic
