@@ -428,13 +428,18 @@ function wipeContent() {
     }
 
     try {
-        const response = await fetch(`/api/notes/${encodeURIComponent(noteId)}`);
+        const response = await fetch(`/api/notes/${encodeURIComponent(noteId)}`, {
+            cache: 'no-store',
+        });
 
         if (response.status === 404) {
             const body = await response.json().catch(() => ({}));
+            if (body.expired) {
+                return showError('Note expired', 'This note has expired and was deleted.');
+            }
             return showError(
-                body.expired ? 'Note expired' : 'Note not found',
-                body.expired ? 'This note has expired and was deleted.' : 'This note no longer exists.'
+                'Content wiped',
+                'This note was set to burn-on-read and has already been viewed. The decrypted content has been permanently removed from the server.'
             );
         }
 
@@ -460,13 +465,13 @@ function wipeContent() {
             const data = await response.json();
             const plaintext = await CryptoUtils.decryptText(data.encryptedBlob, secretKey);
             
-            const remainingSeconds = data.remainingSeconds || (isNaN(timerParam) ? null : timerParam);
+            const remainingSeconds = data.remainingSeconds ?? null;
             showNoteContent(plaintext, data.isOneTime, remainingSeconds);
         }
 
         // --- CLEANUP ---
         // Senior Tip: Remove the key from the URL bar for extra security
-        window.history.replaceState(null, '', window.location.pathname + window.location.search);
+        
 
     } catch (err) {
         console.error(err);

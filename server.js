@@ -84,7 +84,7 @@ app.get('/api/health', (req, res) => {
 // =============================================================================
 app.post('/api/notes', async (req, res) => {
     try {
-        const { encryptedBlob, isOneTime = true } = req.body;
+        const { encryptedBlob, isOneTime = true, expirySeconds = null } = req.body;
 
         // --- Input Validation ---
         if (!isValidBlob(encryptedBlob)) {
@@ -95,16 +95,24 @@ app.post('/api/notes', async (req, res) => {
 
         const oneTimeBit = isOneTime ? 1 : 0;
 
+        // Convert duration → absolute expiry timestamp (stored once, never recomputed from "now")
+        const validTimers = [30, 60, 86400];
+        const secondsNum   = Number(expirySeconds);
+        const expiresAt    = validTimers.includes(secondsNum)
+            ? new Date(Date.now() + secondsNum * 1000)
+            : null;
+
         // --- Parameterized INSERT (prevents SQL Injection) ---
         const db     = await getPool();
         const result = await db.request()
             // Using named parameters — mssql binds these safely as prepared values
             .input('encryptedBlob', mssql.NVarChar(mssql.MAX), encryptedBlob)
             .input('isOneTime',     mssql.Bit,                  oneTimeBit)
+            .input('expiresAt',     mssql.DateTime2,            expiresAt)
             .query(`
-                INSERT INTO dbo.SecretNotes (EncryptedBlob, IsOneTime)
+                INSERT INTO dbo.SecretNotes (EncryptedBlob, IsOneTime, ExpiresAt)
                 OUTPUT INSERTED.NoteID
-                VALUES (@encryptedBlob, @isOneTime)
+                VALUES (@encryptedBlob, @isOneTime, @expiresAt)
             `);
 
         const noteId = result.recordset[0].NoteID;
@@ -132,6 +140,11 @@ app.post('/api/notes', async (req, res) => {
 // =============================================================================
 app.get('/api/notes/:id', async (req, res) => {
     try {
+        // Never let browsers/proxies cache this — burn-on-read depends on
+        // every request actually reaching the server.
+        res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+        res.set('Pragma', 'no-cache');
+
         const { id } = req.params;
 
         // --- Basic GUID format validation (prevents obviously bad queries) ---
@@ -146,7 +159,7 @@ app.get('/api/notes/:id', async (req, res) => {
         const result = await db.request()
             .input('noteId', mssql.UniqueIdentifier, id)
             .query(`
-                SELECT NoteID, EncryptedBlob, IsOneTime
+                SELECT NoteID, EncryptedBlob, IsOneTime, ExpiresAt
                 FROM   dbo.SecretNotes
                 WHERE  NoteID = @noteId
             `);
@@ -159,6 +172,16 @@ app.get('/api/notes/:id', async (req, res) => {
         }
 
         const note = result.recordset[0];
+
+        // --- Timer expiry check (based on stored absolute timestamp, not client input) ---
+        if (note.ExpiresAt && new Date(note.ExpiresAt).getTime() <= Date.now()) {
+            await db.request()
+                .input('noteId', mssql.UniqueIdentifier, id)
+                .query(`DELETE FROM dbo.SecretNotes WHERE NoteID = @noteId`);
+
+            console.log(`[API] Note expired and deleted: ${id}`);
+            return res.status(404).json({ error: 'Note has expired.', expired: true });
+        }
 
         // --- Burn-on-Read Logic ---
         // Delete the note BEFORE responding so even a race condition cannot
@@ -173,10 +196,16 @@ app.get('/api/notes/:id', async (req, res) => {
             console.log(`[API] Note fetched (persistent): ${id}`);
         }
 
+        // Compute remaining seconds fresh from the fixed timestamp — never resets on refresh
+        const remainingSeconds = note.ExpiresAt
+            ? Math.max(0, Math.round((new Date(note.ExpiresAt).getTime() - Date.now()) / 1000))
+            : null;
+
         // Return only the encrypted blob — NEVER plaintext.
         return res.status(200).json({
-            encryptedBlob: note.EncryptedBlob,
-            isOneTime:     note.IsOneTime === true || note.IsOneTime === 1,
+            encryptedBlob:    note.EncryptedBlob,
+            isOneTime:        note.IsOneTime === true || note.IsOneTime === 1,
+            remainingSeconds,
         });
 
     } catch (err) {

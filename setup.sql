@@ -50,6 +50,7 @@ BEGIN
     PRINT 'Index on ExpiresAt created.';
 END
 GO
-
+ALTER TABLE dbo.SecretNotes
+ADD ExpiresAt DATETIME2 NULL;
 PRINT '=== LockBoxDB v2 setup complete ===';
 GO
