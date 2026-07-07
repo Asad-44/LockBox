@@ -1,123 +1,83 @@
 'use strict';
 
 const express = require('express');
-const mssql   = require('mssql');
+const { createClient } = require('redis');
 const cors    = require('cors');
 const path    = require('path');
+const crypto  = require('crypto');
 require('dotenv').config();
 
 // --- App Initialization ---------------------------------------------------
 const app  = express();
 const PORT = process.env.PORT || 3000;
 
-// Middleware
-app.use(cors());                          // Allow cross-origin requests (dev)
-app.use(express.json({ limit: '2mb' })); // Parse JSON bodies (limit blob size)
-app.use(express.static(path.join(__dirname, 'public'))); // Serve frontend files
+app.use(cors());
+app.use(express.json({ limit: '2mb' }));
+app.use(express.static(path.join(__dirname, 'public')));
 
-// --- Database Configuration -----------------------------------------------
-// Reads connection params from the .env file (never hardcode credentials).
-const dbConfig = {
-    server:   process.env.DB_SERVER   || 'localhost',
-    database: process.env.DB_NAME     || 'LockBoxDB',
-    options: {
-        // Use the instance name if provided (e.g., SQLEXPRESS)
-        instanceName:       process.env.DB_INSTANCE || undefined,
-        // Trusted connection uses Windows Auth; set to false for SQL Auth
-        trustedConnection:  process.env.DB_TRUSTED_CONNECTION === 'true',
-        trustServerCertificate: true, // Required for local/dev SQL Server
-        enableArithAbort:   true,
-    },
-    // Only used when trustedConnection is false
-    user:     process.env.DB_USER,
-    password: process.env.DB_PASSWORD,
-    // Connection pool settings
-    pool: {
-        max: 10,
-        min: 0,
-        idleTimeoutMillis: 30000,
-    },
-};
+// --- Redis Client -----------------------------------------------------------
+const redisClient = createClient({
+    url: process.env.REDIS_URL || 'redis://localhost:6379',
+});
 
-// --- Database Connection Pool ---------------------------------------------
-// We create a single pool and reuse it across all requests for efficiency.
-let pool;
+redisClient.on('error', (err) => console.error('[Redis] Client error:', err.message));
 
-async function getPool() {
-    if (!pool) {
-        pool = await mssql.connect(dbConfig);
-        console.log('[DB] Connected to SQL Server successfully.');
-    }
-    return pool;
+async function connectRedis() {
+    await redisClient.connect();
+    console.log('[Redis] Connected successfully.');
 }
 
-// --- Helper: Input Validation ---------------------------------------------
-/**
- * Validates that the encrypted blob string is non-empty and within a
- * safe size limit to prevent abuse / oversized payloads.
- */
+// --- Helpers -----------------------------------------------------------------
 function isValidBlob(blob) {
     if (typeof blob !== 'string') return false;
     if (blob.trim().length === 0)  return false;
-    if (blob.length > 1_500_000)   return false; // ~1 MB of base64 ciphertext
+    if (blob.length > 1_500_000)   return false;
     return true;
 }
+
+const VALID_TIMERS = [30, 60, 86400];
+const noteKey = (id) => `note:${id}`;
 
 // =============================================================================
 // ROUTES
 // =============================================================================
 
-// --- Health Check -----------------------------------------------------------
 app.get('/api/health', (req, res) => {
     res.json({ status: 'ok', message: 'LockBox API is running.' });
 });
 
-// --- POST /api/notes --------------------------------------------------------
-// Receives an AES-encrypted blob from the client and stores it.
-// Returns the auto-generated NoteID (GUID) used to build the share link.
-//
-// Request body:
-//   { "encryptedBlob": "<CryptoJS AES ciphertext string>", "isOneTime": true }
-//
-// Response:
-//   { "noteId": "<GUID>" }
+// --- POST /api/notes ---------------------------------------------------------
+// Stores the encrypted blob in Redis. If expirySeconds is set, Redis handles
+// auto-deletion natively via TTL — no manual expiry tracking needed.
 // =============================================================================
 app.post('/api/notes', async (req, res) => {
     try {
         const { encryptedBlob, isOneTime = true, expirySeconds = null } = req.body;
 
-        // --- Input Validation ---
         if (!isValidBlob(encryptedBlob)) {
             return res.status(400).json({
                 error: 'Invalid payload. "encryptedBlob" must be a non-empty string under 1 MB.',
             });
         }
 
-        const oneTimeBit = isOneTime ? 1 : 0;
+        const noteId = crypto.randomUUID();
+        const secondsNum = Number(expirySeconds);
+        const ttl = VALID_TIMERS.includes(secondsNum) ? secondsNum : null;
 
-        // Convert duration → absolute expiry timestamp (stored once, never recomputed from "now")
-        const validTimers = [30, 60, 86400];
-        const secondsNum   = Number(expirySeconds);
-        const expiresAt    = validTimers.includes(secondsNum)
-            ? new Date(Date.now() + secondsNum * 1000)
-            : null;
+        const payload = JSON.stringify({
+            encryptedBlob,
+            isOneTime: !!isOneTime,
+        });
 
-        // --- Parameterized INSERT (prevents SQL Injection) ---
-        const db     = await getPool();
-        const result = await db.request()
-            // Using named parameters — mssql binds these safely as prepared values
-            .input('encryptedBlob', mssql.NVarChar(mssql.MAX), encryptedBlob)
-            .input('isOneTime',     mssql.Bit,                  oneTimeBit)
-            .input('expiresAt',     mssql.DateTime2,            expiresAt)
-            .query(`
-                INSERT INTO dbo.SecretNotes (EncryptedBlob, IsOneTime, ExpiresAt)
-                OUTPUT INSERTED.NoteID
-                VALUES (@encryptedBlob, @isOneTime, @expiresAt)
-            `);
+        if (ttl) {
+            // SET with EX — Redis deletes the key automatically when TTL hits 0
+            await redisClient.set(noteKey(noteId), payload, { EX: ttl });
+        } else {
+            // No timer — persists until burned or manually cleared
+            await redisClient.set(noteKey(noteId), payload);
+        }
 
-        const noteId = result.recordset[0].NoteID;
-        console.log(`[API] Note created: ${noteId}`);
-
+        console.log(`[API] Note created: ${noteId}${ttl ? ` (TTL ${ttl}s)` : ''}`);
         return res.status(201).json({ noteId });
 
     } catch (err) {
@@ -126,85 +86,55 @@ app.post('/api/notes', async (req, res) => {
     }
 });
 
-// --- GET /api/notes/:id -----------------------------------------------------
-// Fetches the encrypted blob for a given NoteID.
-//
-// BURN-ON-READ:
-//   If the note's IsOneTime flag is set, the note is DELETED from the database
-//   BEFORE the response is sent. This ensures one-time access only.
-//   The server only ever returns the encrypted blob — it has no ability to
-//   decrypt it without the key, which it never receives.
-//
-// Response:
-//   { "encryptedBlob": "<ciphertext>", "isOneTime": true }
+// --- GET /api/notes/:id -------------------------------------------------------
+// Fetches the encrypted blob. Burn-on-read notes are deleted immediately after
+// being read. Timer-based notes rely on Redis TTL for expiry, and we report
+// the live remaining TTL back to the client so refreshes show the correct time.
 // =============================================================================
 app.get('/api/notes/:id', async (req, res) => {
     try {
-        // Never let browsers/proxies cache this — burn-on-read depends on
-        // every request actually reaching the server.
         res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
         res.set('Pragma', 'no-cache');
 
         const { id } = req.params;
 
-        // --- Basic GUID format validation (prevents obviously bad queries) ---
         const guidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
         if (!guidRegex.test(id)) {
             return res.status(400).json({ error: 'Invalid Note ID format.' });
         }
 
-        const db = await getPool();
+        const key = noteKey(id);
 
-        // --- Parameterized SELECT ---
-        const result = await db.request()
-            .input('noteId', mssql.UniqueIdentifier, id)
-            .query(`
-                SELECT NoteID, EncryptedBlob, IsOneTime, ExpiresAt
-                FROM   dbo.SecretNotes
-                WHERE  NoteID = @noteId
-            `);
+        // Read the TTL and value together. TTL of -2 means the key doesn't
+        // exist (never created, already burned, or already expired) — Redis
+        // doesn't distinguish these after the fact, so we report one message.
+        const [ttl, raw] = await Promise.all([
+            redisClient.ttl(key),
+            redisClient.get(key),
+        ]);
 
-        // If no rows returned, the note doesn't exist (or was already burned)
-        if (result.recordset.length === 0) {
+        if (raw === null) {
             return res.status(404).json({
-                error: 'Note not found. It may have already been read and destroyed, or never existed.',
+                error: 'Note not found. It may have expired, already been viewed, or never existed.',
             });
         }
 
-        const note = result.recordset[0];
-
-        // --- Timer expiry check (based on stored absolute timestamp, not client input) ---
-        if (note.ExpiresAt && new Date(note.ExpiresAt).getTime() <= Date.now()) {
-            await db.request()
-                .input('noteId', mssql.UniqueIdentifier, id)
-                .query(`DELETE FROM dbo.SecretNotes WHERE NoteID = @noteId`);
-
-            console.log(`[API] Note expired and deleted: ${id}`);
-            return res.status(404).json({ error: 'Note has expired.', expired: true });
-        }
+        const note = JSON.parse(raw);
 
         // --- Burn-on-Read Logic ---
-        // Delete the note BEFORE responding so even a race condition cannot
-        // allow a second client to retrieve it while we're sending the response.
-        if (note.IsOneTime) {
-            await db.request()
-                .input('noteId', mssql.UniqueIdentifier, id)
-                .query(`DELETE FROM dbo.SecretNotes WHERE NoteID = @noteId`);
-
+        if (note.isOneTime) {
+            await redisClient.del(key);
             console.log(`[API] Note burned (one-time read): ${id}`);
         } else {
             console.log(`[API] Note fetched (persistent): ${id}`);
         }
 
-        // Compute remaining seconds fresh from the fixed timestamp — never resets on refresh
-        const remainingSeconds = note.ExpiresAt
-            ? Math.max(0, Math.round((new Date(note.ExpiresAt).getTime() - Date.now()) / 1000))
-            : null;
+        // ttl > 0 means a real expiry is active; -1 means no TTL (persistent)
+        const remainingSeconds = ttl > 0 ? ttl : null;
 
-        // Return only the encrypted blob — NEVER plaintext.
         return res.status(200).json({
-            encryptedBlob:    note.EncryptedBlob,
-            isOneTime:        note.IsOneTime === true || note.IsOneTime === 1,
+            encryptedBlob: note.encryptedBlob,
+            isOneTime: note.isOneTime,
             remainingSeconds,
         });
 
@@ -229,15 +159,14 @@ app.get('*', (req, res) => {
 // =============================================================================
 async function startServer() {
     try {
-        // Verify DB connection before accepting traffic
-        await getPool();
+        await connectRedis();
         app.listen(PORT, () => {
             console.log(`\n🔒 LockBox server running at http://localhost:${PORT}`);
             console.log(`   Environment: ${process.env.NODE_ENV || 'development'}\n`);
         });
     } catch (err) {
-        console.error('[FATAL] Could not connect to the database:', err.message);
-        console.error('        Check your .env configuration and ensure SQL Server is running.');
+        console.error('[FATAL] Could not connect to Redis:', err.message);
+        console.error('        Check REDIS_URL in .env and ensure Redis is running.');
         process.exit(1);
     }
 }
