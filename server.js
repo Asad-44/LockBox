@@ -1,6 +1,7 @@
 'use strict';
 
 const express = require('express');
+const multer  = require('multer');
 const { createClient } = require('redis');
 const cors    = require('cors');
 const path    = require('path');
@@ -14,6 +15,13 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json({ limit: '2mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
+
+// Multer stores the uploaded file in memory as a Buffer (req.file.buffer) —
+// we never write it to disk, keeping the zero-knowledge server model intact.
+const upload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 6 * 1024 * 1024 }, // 6MB raw cap (encrypted blob is slightly larger than original file)
+});
 
 // --- Redis Client -----------------------------------------------------------
 const redisClient = createClient({
@@ -47,37 +55,64 @@ app.get('/api/health', (req, res) => {
 });
 
 // --- POST /api/notes ---------------------------------------------------------
-// Stores the encrypted blob in Redis. If expirySeconds is set, Redis handles
-// auto-deletion natively via TTL — no manual expiry tracking needed.
+// Handles BOTH:
+//   - JSON body for text notes  (Content-Type: application/json)
+//   - multipart/form-data for files (Content-Type: multipart/form-data)
+// `upload.single('file')` only parses the body if it's actually multipart;
+// for JSON requests it's a no-op and req.body/express.json() still applies.
 // =============================================================================
-app.post('/api/notes', async (req, res) => {
+app.post('/api/notes', upload.single('file'), async (req, res) => {
     try {
-        const { encryptedBlob, isOneTime = true, expirySeconds = null } = req.body;
+        const isFile = req.body.isFile === 'true' || req.body.isFile === true;
 
-        if (!isValidBlob(encryptedBlob)) {
-            return res.status(400).json({
-                error: 'Invalid payload. "encryptedBlob" must be a non-empty string under 1 MB.',
+        const noteId = crypto.randomUUID();
+        const isOneTime = req.body.isOneTime === 'true' || req.body.isOneTime === true;
+        const secondsNum = Number(req.body.expirySeconds);
+        const ttl = VALID_TIMERS.includes(secondsNum) ? secondsNum : null;
+
+        let payload;
+
+        if (isFile) {
+            // --- File branch: req.file.buffer holds the encrypted Blob's bytes ---
+            if (!req.file || !req.file.buffer || req.file.buffer.length === 0) {
+                return res.status(400).json({ error: 'No file received.' });
+            }
+            if (req.file.buffer.length > 6 * 1024 * 1024) {
+                return res.status(400).json({ error: 'File too large. Maximum size is 5 MB.' });
+            }
+
+            payload = JSON.stringify({
+                type: 'file',
+                fileName: req.body.fileName || 'downloaded_file',
+                isOneTime,
+                // Store binary as base64 inside the JSON payload for simplicity
+                data: req.file.buffer.toString('base64'),
+            });
+
+        } else {
+            // --- Note branch: JSON body ---
+            const { encryptedBlob } = req.body;
+
+            if (!isValidBlob(encryptedBlob)) {
+                return res.status(400).json({
+                    error: 'Invalid payload. "encryptedBlob" must be a non-empty string under 1 MB.',
+                });
+            }
+
+            payload = JSON.stringify({
+                type: 'note',
+                isOneTime,
+                encryptedBlob,
             });
         }
 
-        const noteId = crypto.randomUUID();
-        const secondsNum = Number(expirySeconds);
-        const ttl = VALID_TIMERS.includes(secondsNum) ? secondsNum : null;
-
-        const payload = JSON.stringify({
-            encryptedBlob,
-            isOneTime: !!isOneTime,
-        });
-
         if (ttl) {
-            // SET with EX — Redis deletes the key automatically when TTL hits 0
             await redisClient.set(noteKey(noteId), payload, { EX: ttl });
         } else {
-            // No timer — persists until burned or manually cleared
             await redisClient.set(noteKey(noteId), payload);
         }
 
-        console.log(`[API] Note created: ${noteId}${ttl ? ` (TTL ${ttl}s)` : ''}`);
+        console.log(`[API] ${isFile ? 'File' : 'Note'} created: ${noteId}${ttl ? ` (TTL ${ttl}s)` : ''}`);
         return res.status(201).json({ noteId });
 
     } catch (err) {
@@ -87,9 +122,9 @@ app.post('/api/notes', async (req, res) => {
 });
 
 // --- GET /api/notes/:id -------------------------------------------------------
-// Fetches the encrypted blob. Burn-on-read notes are deleted immediately after
-// being read. Timer-based notes rely on Redis TTL for expiry, and we report
-// the live remaining TTL back to the client so refreshes show the correct time.
+// Branches response format based on stored type:
+//   - note → JSON { encryptedBlob, isOneTime, remainingSeconds }
+//   - file → raw binary body + X-File-Name / X-Is-One-Time / X-Remaining-Seconds headers
 // =============================================================================
 app.get('/api/notes/:id', async (req, res) => {
     try {
@@ -105,9 +140,6 @@ app.get('/api/notes/:id', async (req, res) => {
 
         const key = noteKey(id);
 
-        // Read the TTL and value together. TTL of -2 means the key doesn't
-        // exist (never created, already burned, or already expired) — Redis
-        // doesn't distinguish these after the fact, so we report one message.
         const [ttl, raw] = await Promise.all([
             redisClient.ttl(key),
             redisClient.get(key),
@@ -121,17 +153,25 @@ app.get('/api/notes/:id', async (req, res) => {
 
         const note = JSON.parse(raw);
 
-        // --- Burn-on-Read Logic ---
         if (note.isOneTime) {
             await redisClient.del(key);
-            console.log(`[API] Note burned (one-time read): ${id}`);
+            console.log(`[API] ${note.type} burned (one-time read): ${id}`);
         } else {
-            console.log(`[API] Note fetched (persistent): ${id}`);
+            console.log(`[API] ${note.type} fetched (persistent): ${id}`);
         }
 
-        // ttl > 0 means a real expiry is active; -1 means no TTL (persistent)
         const remainingSeconds = ttl > 0 ? ttl : null;
 
+        if (note.type === 'file') {
+            const buffer = Buffer.from(note.data, 'base64');
+            res.set('Content-Type', 'application/octet-stream');
+            res.set('X-File-Name', encodeURIComponent(note.fileName));
+            res.set('X-Is-One-Time', String(note.isOneTime));
+            if (remainingSeconds !== null) res.set('X-Remaining-Seconds', String(remainingSeconds));
+            return res.status(200).send(buffer);
+        }
+
+        // Text note
         return res.status(200).json({
             encryptedBlob: note.encryptedBlob,
             isOneTime: note.isOneTime,
